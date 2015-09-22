@@ -17,18 +17,19 @@ object Main {
       reporter.fatal("Exactly one file expected, "+files.size+" file(s) given.")
     }
 
-    Context(reporter = reporter, files = new File(files.head) :: Nil)
+    Context(reporter = reporter, file = new File(files.head))
   }
 
 
   def main(args: Array[String]) {
     val ctx = processOptions(args)
 
-    val program = new Parser().parse(ctx, ctx.files.head)
+    val pipeline = Lexer andThen
+                   PrintTokens
 
-    val evaluator = new Evaluator(ctx, program)
+    val result = pipeline.run(ctx)(ctx.file)
 
-    evaluator.eval()
-
+    ctx.reporter.terminateIfErrors
+      
   }
 }
