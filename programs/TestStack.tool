@@ -1,3 +1,6 @@
+/*
+ * This program implements a stack and test the push() and pop() methods.
+ */
 object TestStack {
     def main() : Unit = {
         println(new Tester().test());
@@ -27,7 +30,7 @@ class Tester {
         println("  Element popped: " + head);
         println("  Stack: " + stack.printStack());
 
-        return ">Exit";
+        return "bye.";
     }
 }
 
