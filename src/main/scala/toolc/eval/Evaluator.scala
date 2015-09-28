@@ -23,7 +23,7 @@ class Evaluator(ctx: Context, prog: Program) {
     case Assign(id, expr) => ???
     case ArrayAssign(id, index, expr) => ???
     case _ =>
-      fatal("unnexpected statement", stmt)
+      fatal("unexpected statement", stmt)
   }
 
   def evalExpr(ectx: EvaluationContext, e: ExprTree): Value = e match {
@@ -33,20 +33,18 @@ class Evaluator(ctx: Context, prog: Program) {
     case False()          => BoolValue(false)
     case And(lhs, rhs) =>
       val lv = evalExpr(ectx, lhs)
-      val rv = evalExpr(ectx, rhs)
-      val res = (lv, rv) match {
-        case (BoolValue(false), _) => BoolValue(false)
-        case (BoolValue(true), BoolValue(r)) => BoolValue(r)
+      lv match {
+        case BoolValue(true) => evalExpr(ectx, rhs)
+        case _ => BoolValue(false)
       }
-      res
+
     case Or(lhs, rhs)  =>
       val lv = evalExpr(ectx, lhs)
-      val rv = evalExpr(ectx, rhs)
-      val res = (lv, rv) match {
-        case (BoolValue(true), _) => BoolValue(true)
-        case (BoolValue(false), BoolValue(r)) => BoolValue(r)
+      lv match {
+        case BoolValue(false) => evalExpr(ectx, rhs)
+        case _ => BoolValue(true)
       }
-      res
+
     case Plus(lhs, rhs) =>
       val lv = evalExpr(ectx, lhs)
       val rv = evalExpr(ectx, rhs)
@@ -55,43 +53,54 @@ class Evaluator(ctx: Context, prog: Program) {
         case (StringValue(l), StringValue(r)) => StringValue(l.concat(r))
         case (StringValue(l), IntValue(r)) => StringValue(l.concat(r.toString))
         case (IntValue(l), StringValue(r)) => StringValue(l.toString.concat(r))
+        case _ => fatal("unexpected statement")
       }
       res
+
     case Minus(lhs, rhs) =>
       val lv = evalExpr(ectx, lhs)
       val rv = evalExpr(ectx, rhs)
       val res = (lv, rv) match {
         case (IntValue(l), IntValue(r)) => IntValue(l - r)
+        case _ => fatal("unexpected statement")
       }
       res
+
     case Times(lhs, rhs) =>
       val lv = evalExpr(ectx, lhs)
       val rv = evalExpr(ectx, rhs)
       val res = (lv, rv) match {
         case (IntValue(l), IntValue(r)) => IntValue(l * r)
+        case _ => fatal("unexpected statement")
       }
       res
+
     case Div(lhs, rhs) =>
       val lv = evalExpr(ectx, lhs)
       val rv = evalExpr(ectx, rhs)
       val res = (lv, rv) match {
         case (IntValue(l), IntValue(r)) => IntValue(l / r)
+        case _ => fatal("unexpected statement")
       }
       res
+
     case LessThan(lhs, rhs) =>
       val lv = evalExpr(ectx, lhs)
       val rv = evalExpr(ectx, rhs)
       val res = (lv, rv) match {
         case (IntValue(l), IntValue(r)) => BoolValue(l < r)
+        case _ => fatal("unexpected statement")
       }
       res
+
     case Not(expr) =>
       val e = evalExpr(ectx, expr)
       val res = e match {
-        case (BoolValue(true)) => BoolValue(false)
-        case (BoolValue(false)) => BoolValue(true)
+        case (BoolValue(x)) => BoolValue(!x)
+        case _ => fatal("unexpected statement")
       }
       res
+
     case Equals(lhs, rhs) =>
       val lv = evalExpr(ectx, lhs)
       val rv = evalExpr(ectx, rhs)
@@ -102,11 +111,47 @@ class Evaluator(ctx: Context, prog: Program) {
       }
       BoolValue(res)
 
-    case ArrayRead(arr, index) => ???
-    case ArrayLength(arr) => ???
-    case MethodCall(obj, meth, args) => ???
-    case Identifier(name) => ???
-    case New(tpe) => ???
+    case ArrayRead(arr, index) =>
+      val array = evalExpr(ectx, arr)
+      val idx = evalExpr(ectx, index)
+      IntValue(array.asArray.getIndex(idx.asInt))
+
+    case ArrayLength(arr) =>
+      val array = evalExpr(ectx, arr)
+      IntValue(array.asArray.size)
+
+    case MethodCall(obj, meth, args) =>
+      val objet = evalExpr(ectx, obj)
+      val method = new MethodContext(objet.asObject)
+      objet match {
+        case ObjectValue(x) => {
+          val mtc = findMethod(x, meth.value)
+          val stats = mtc.stats
+          for (i <- mtc.vars) {
+            method.declareVariable(x.id.value)
+          }
+          val test = mtc.args.zip(args)
+          for ((a, b) <- test) {
+            method.declareVariable(a.id.value)
+            method.setVariable(a.id.value, evalExpr(ectx, b))
+          }
+          for (statement <- stats) {
+            evalStatement(method, statement)
+          }
+          evalExpr(method, mtc.retExpr)
+        }
+        case _ => fatal("unexpected statement")
+      }
+
+    case Identifier(name) => ectx.getVariable(name)
+    case New(tpe) =>
+      val kind = findClass(tpe.value)
+      val objet = ObjectValue(kind)
+      for (field <- fieldsOfClass(kind)) {
+        objet.declareField(field)
+      }
+      objet
+
     case This() => ???
     case NewIntArray(size) => ???
   }
