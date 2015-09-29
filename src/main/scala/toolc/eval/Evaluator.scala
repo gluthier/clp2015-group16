@@ -39,7 +39,7 @@ class Evaluator(ctx: Context, prog: Program) {
                 case (IntValue(e)) => println(e.asInt)
                 case (BoolValue(e)) => println(e.asBool)
                 case (StringValue(e)) => println(e.asString)
-                case _ => fatal("unnexpected type")
+                case _ => fatal("unexpected type")
             }
 
         case Assign(id, expr) =>
@@ -50,7 +50,7 @@ class Evaluator(ctx: Context, prog: Program) {
             array.setIndex(index.asInt, evalExpr(ectx, expr).asInt)
 
         case _ =>
-            fatal("unnexpected statement", stmt)
+            fatal("unexpected statement", stmt)
     }
 
     def evalExpr(ectx: EvaluationContext, e: ExprTree): Value = e match {
@@ -81,7 +81,7 @@ class Evaluator(ctx: Context, prog: Program) {
                 case (StringValue(l), StringValue(r)) => StringValue(l.concat(r))
                 case (StringValue(l), IntValue(r)) => StringValue(l.concat(r.toString))
                 case (IntValue(l), StringValue(r)) => StringValue(l.toString.concat(r))
-                case _ => fatal("unnexpected statement")
+                case _ => fatal("unexpected statement")
             }
 
         case Minus(lhs, rhs) =>
@@ -89,7 +89,7 @@ class Evaluator(ctx: Context, prog: Program) {
             val rv = evalExpr(ectx, rhs)
             (lv, rv) match {
                 case (IntValue(l), IntValue(r)) => IntValue(l - r)
-                case _ => fatal("unnexpected statement")
+                case _ => fatal("unexpected statement")
             }
 
         case Times(lhs, rhs) =>
@@ -97,7 +97,7 @@ class Evaluator(ctx: Context, prog: Program) {
             val rv = evalExpr(ectx, rhs)
             (lv, rv) match {
                 case (IntValue(l), IntValue(r)) => IntValue(l * r)
-                case _ => fatal("unnexpected statement")
+                case _ => fatal("unexpected statement")
             }
 
         case Div(lhs, rhs) =>
@@ -105,7 +105,7 @@ class Evaluator(ctx: Context, prog: Program) {
             val rv = evalExpr(ectx, rhs)
             (lv, rv) match {
                 case (IntValue(l), IntValue(r)) => IntValue(l / r)
-                case _ => fatal("unnexpected statement")
+                case _ => fatal("unexpected statement")
             }
 
         case LessThan(lhs, rhs) =>
@@ -113,16 +113,16 @@ class Evaluator(ctx: Context, prog: Program) {
             val rv = evalExpr(ectx, rhs)
             (lv, rv) match {
                 case (IntValue(l), IntValue(r)) => BoolValue(l < r)
-                case _ => fatal("unnexpected statement")
+                case _ => fatal("unexpected statement")
             }
 
         case Not(expr) =>
             val e = evalExpr(ectx, expr)
             e match {
-                case (BoolValue(true)) => BoolValue(!e)
-                case _ => fatal("unnexpected statement")
+                case (BoolValue(b)) => BoolValue(!b)
+                case _ => fatal("unexpected statement")
             }
-            
+
         case Equals(lhs, rhs) =>
             val lv = evalExpr(ectx, lhs)
             val rv = evalExpr(ectx, rhs)
@@ -175,7 +175,12 @@ class Evaluator(ctx: Context, prog: Program) {
             }
             objet
 
-        case This() => ???
+        case This() =>
+            ectx match {
+                case mc : MethodContext => mc.obj
+                case _ => fatal("unexpected statement")
+            }
+
         case NewIntArray(size) => ???
     }
 
@@ -239,11 +244,11 @@ class Evaluator(ctx: Context, prog: Program) {
 
     // Runtime evaluation values, with as* methods which act as typecasts for convenience.
     sealed abstract class Value {
-        def asInt: Int            = fatal("Unnexpected value, found "+this+" expected Int")
-        def asString: String      = fatal("Unnexpected value, found "+this+" expected String")
-        def asBool: Boolean       = fatal("Unnexpected value, found "+this+" expected Boolean")
-        def asObject: ObjectValue = fatal("Unnexpected value, found "+this+" expected Object")
-        def asArray: ArrayValue   = fatal("Unnexpected value, found "+this+" expected Array")
+        def asInt: Int            = fatal("Unexpected value, found "+this+" expected Int")
+        def asString: String      = fatal("Unexpected value, found "+this+" expected String")
+        def asBool: Boolean       = fatal("Unexpected value, found "+this+" expected Boolean")
+        def asObject: ObjectValue = fatal("Unexpected value, found "+this+" expected Object")
+        def asArray: ArrayValue   = fatal("Unexpected value, found "+this+" expected Array")
     }
 
     case class ObjectValue(cd: ClassDecl) extends Value {
