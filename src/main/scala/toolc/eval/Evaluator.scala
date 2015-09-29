@@ -40,14 +40,13 @@ class Evaluator(ctx: Context, prog: Program) {
     case Println(expr) =>
       val x = evalExpr(ectx, expr)
       x match {
-        case IntValue(e) => println(x.asInt)
-        case BoolValue(e) => println(x.asBool)
-        case StringValue(e) => println(x.asString)
+        case int: IntValue => println(int.asInt)
+        case bool: BoolValue => println(bool.asBool)
+        case str: StringValue => println(str.asString)
         case _ => fatal("unexpected type")
       }
 
-    case Assign(id, expr) =>
-      ectx.setVariable(id.value, evalExpr(ectx, expr))
+    case Assign(id, expr) => ectx.setVariable(id.value, evalExpr(ectx, expr))
 
     case ArrayAssign(id, index, expr) =>
       val array = ectx.getVariable(id.value).asArray
@@ -82,9 +81,9 @@ class Evaluator(ctx: Context, prog: Program) {
       val rv = evalExpr(ectx, rhs)
       (lv, rv) match {
         case (IntValue(l), IntValue(r)) => IntValue(l + r)
-        case (StringValue(l), StringValue(r)) => StringValue(l.concat(r))
-        case (StringValue(l), IntValue(r)) => StringValue(l.concat(r.toString))
-        case (IntValue(l), StringValue(r)) => StringValue(l.toString.concat(r))
+        case (StringValue(l), StringValue(r)) => StringValue(l + r)
+        case (StringValue(l), IntValue(r)) => StringValue(l + r)
+        case (IntValue(l), StringValue(r)) => StringValue(l + r)
         case _ => fatal("unexpected statement")
       }
 
@@ -123,7 +122,7 @@ class Evaluator(ctx: Context, prog: Program) {
     case Not(expr) =>
       val e = evalExpr(ectx, expr)
       e match {
-        case (BoolValue(b)) => BoolValue(!b)
+        case BoolValue(b) => BoolValue(!b)
         case _ => fatal("unexpected statement")
       }
 
@@ -165,9 +164,9 @@ class Evaluator(ctx: Context, prog: Program) {
             evalStatement(method, statement)
           }
           evalExpr(method, mtc.retExpr)
-        }
         case _ => fatal("unexpected statement")
-      
+      }
+
 
     case Identifier(name) => ectx.getVariable(name)
 
