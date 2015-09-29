@@ -32,8 +32,7 @@ class Evaluator(ctx: Context, prog: Program) {
       }
 
     case While(expr, stat) =>
-      val cond = evalExpr(ectx, expr).asBool
-      while (cond) {
+      while (evalExpr(ectx, expr).asBool) {
         evalStatement(ectx, stat)
       }
 
@@ -137,13 +136,13 @@ class Evaluator(ctx: Context, prog: Program) {
       BoolValue(res)
 
     case ArrayRead(arr, index) =>
-      val array = evalExpr(ectx, arr)
-      val idx = evalExpr(ectx, index)
-      IntValue(array.asArray.getIndex(idx.asInt))
+      val array = evalExpr(ectx, arr).asArray
+      val idx = evalExpr(ectx, index).asInt
+      IntValue(array.getIndex(idx))
 
     case ArrayLength(arr) =>
-      val array = evalExpr(ectx, arr)
-      IntValue(array.asArray.size)
+      val array = evalExpr(ectx, arr).asArray
+      IntValue(array.size)
 
     case MethodCall(obj, meth, args) =>
       val objet = evalExpr(ectx, obj)
@@ -153,7 +152,7 @@ class Evaluator(ctx: Context, prog: Program) {
           val mtc = findMethod(x, meth.value)
           val stats = mtc.stats
           for (i <- mtc.vars) {
-            method.declareVariable(x.id.value)
+            method.declareVariable(i.id.value)
           }
           val test = mtc.args.zip(args)
           for ((a, b) <- test) {
@@ -166,7 +165,6 @@ class Evaluator(ctx: Context, prog: Program) {
           evalExpr(method, mtc.retExpr)
         case _ => fatal("unexpected statement")
       }
-
 
     case Identifier(name) => ectx.getVariable(name)
 
