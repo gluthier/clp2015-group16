@@ -1,6 +1,6 @@
 object BinaryTree {
     def main(): Unit = {
-        println(new BT().Start())
+        println(new BT().Start(10));
     }
 }
 
@@ -9,23 +9,32 @@ class BT {
     var size : Int;
     var tree : Tree;
 
-    def Start(sz : Int) : Int[] = {
+    def Start(sz : Int) : Int = {
         var aux01 : Int;
         var aux02 : Int;
 
         aux01 = this.Init(sz);
         aux02 = this.CreateTree(sz);
+
+        return 0;
     }
 
     def CreateTree(sz : Int) : Int = {
         var counter : Int;
         var aux00 : Int;
+        var aux01 : Int;
 
-        aux00 = tree.setRoot(None());
+        tree = new Tree();
+
+        aux00 = tree.setRoot(new None().init(0));
         counter = 0;
         while (counter < sz) {
-
+            aux01 = tree.insert(number[counter], tree.getRoot(), new None().init(0));
+            println("Inserted " + number[counter] + " into tree.");
+            counter = counter + 1;
         }
+
+        return 0;
     }
 
     // Initialize array of integers
@@ -52,25 +61,30 @@ class Tree {
     var root : Node;
 
     def setRoot(nd : Node) : Int = {
-        this.root = nd;
+        root = nd;
 
         return 0;
     }
 
     def getRoot() : Node = {
-        return this.root;
+        return root;
     }
 
-    def insert(value : Int, root : Node) : Int = {
+    def insert(value : Int, root : Node, parent : Node) : Int = {
         var newNode : Node;
-        newNode = Node(value);
+        var aux01 : Int;
+
+        newNode = new Node().init(value);
         if (root.getType() == 0) {
-            tree.setRoot(newNode);
+            aux01 = this.setRoot(newNode);
         } else {
             if (root.getValue() < value) {
-                insert(value, root.getLeft())
+                aux01 = this.insert(value, root.getLeft(), root);
+            } else {
+                aux01 = this.insert(value, root.getRight(), root);
             }
         }
+        return 0;
     }
 }
 
@@ -81,13 +95,16 @@ class Node {
     var right : Node;
     var type : Int;
 
-    def getType() : Int = {
-        return this.type;
+    def init(nv : Int) : Node = {
+        type = 1;
+        value = nv;
+        left = new None().init(0);
+        right = new None().init(0);
+        return this;
     }
 
-    def init(nv : Int) : Node = {
-        value = nv;
-        return this;
+    def getType() : Int = {
+        return type;
     }
 
     def getValue() : Int = {
@@ -101,17 +118,34 @@ class Node {
     def getRight() : Node = {
         return right;
     }
+
+    def setLeft(nd : Node) : Int = {
+        left = nd;
+        return 0;
+    }
+
+    def setRight(nd : Node) : Int = {
+        right = nd;
+        return 0;
+    }
 }
 
 class Leaf extends Node {
-    left = None();
-    right = None();
-    type = 1;
+    def init(nv : Int) : Node = {
+        value = nv;
+        left = new None();
+        right = new None();
+        type = 1;
+        return this;
+    }
 }
 
 class None extends Node {
-    parent = this;
-    left = this;
-    right = this;
-    type = 0;
+    def init(nv : Int) : Node = {
+        parent = this;
+        left = this;
+        right = this;
+        type = 0;
+        return this;
+    }
 }
