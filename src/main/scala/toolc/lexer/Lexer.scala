@@ -179,7 +179,7 @@ object Lexer extends Pipeline[File, Iterator[Token]] {
               token = new Token(BAD)
               error("Bad Token", currentPos)
             } else {
-              token = new STRLIT(b.mkString)
+              token = new STRLIT(builder.mkString)
             }
           case _ =>
             token = new Token(BAD)
