@@ -10,6 +10,29 @@ object Lexer extends Pipeline[File, Iterator[Token]] {
 
   import Tokens._
 
+  val map: Map[String, TokenKind] = Map(
+        "object" -> Tokens.OBJECT,
+        "class" -> Tokens.CLASS,
+        "def" -> Tokens.DEF,
+        "var" -> Tokens.VAR,
+        "Unit" -> Tokens.UNIT,
+        "main" -> Tokens.MAIN,
+        "String" -> Tokens.STRING,
+        "extends" -> Tokens.EXTENDS,
+        "Int" -> Tokens.INT,
+        "Bool" -> Tokens.BOOLEAN,
+        "while" -> Tokens.WHILE,
+        "if" -> Tokens.IF,
+        "else" -> Tokens.ELSE,
+        "return" -> Tokens.RETURN,
+        "length" -> Tokens.LENGTH,
+        "true" -> Tokens.TRUE,
+        "false" -> Tokens.FALSE,
+        "this" -> Tokens.THIS,
+        "new" -> Tokens.NEW,
+        "println" -> Tokens.PRINTLN
+  )
+
   def run(ctx: Context)(f: File): Iterator[Token] = {
     val source = Source.fromFile(f)
     import ctx.reporter._
@@ -20,7 +43,7 @@ object Lexer extends Pipeline[File, Iterator[Token]] {
 
     var droppedChar : Option[Char] = None
 
-    def getChar(source: BufferedSource) = droppedChar match {
+    def readChar(source: BufferedSource) = droppedChar match {
       case Some(x) =>
         droppedChar = None
         x
@@ -29,19 +52,20 @@ object Lexer extends Pipeline[File, Iterator[Token]] {
 
     def readNextToken(): Token = {
       var token: Token = null
-      var p: Int = 0
+      var position: Int = 0
+
       if (source hasNext) {
         val builder: StringBuilder = new StringBuilder
-        var c: Char = getChar(source)
-        p = source.pos
+        var c: Char = readChar(source)
+        position = source.pos
 
         if (c.isLetter) {
           builder append c
           if (source.hasNext) {
-            c = getChar(source)
+            c = readChar(source)
             while (source.hasNext && c.isLetterOrDigit || c == '_') {
               builder append c
-              c = getChar(source)
+              c = readChar(source)
             }
             if (!c.isLetterOrDigit) {
               droppedChar = Some(c)
@@ -52,26 +76,22 @@ object Lexer extends Pipeline[File, Iterator[Token]] {
             case Some(x: TokenKind) => token = new Token(x)
             case None => token = new ID(tokenString)
           }
-        }
-        else if (c.isDigit) {
+        } else if (c.isDigit) {
           var k: Int = 0
           while (source.hasNext && c.isDigit) {
             k = (10 * k) + c.asDigit
-            c = getChar(source)
+            c = readChar(source)
           }
           if (!c.isDigit) {
             droppedChar = Some(c)
           }
 
-
           token = new INTLIT(k)
-        }
-        else if (c.isWhitespace) {
+        } else if (c.isWhitespace) {
           return readNextToken()
-        }
-        else c match {
+        } else c match {
           case '=' =>
-            val temp = getChar(source)
+            val temp = readChar(source)
             if (temp == '=') {
               token = new Token(EQUALS)
             } else {
@@ -101,24 +121,22 @@ object Lexer extends Pipeline[File, Iterator[Token]] {
           case '}' =>
             token = new Token(RBRACE)
           case '&' =>
-            val temp = getChar(source)
+            val temp = readChar(source)
             if (temp == '&') {
               token = new Token(AND)
-            }
-            else {
+            } else {
               droppedChar = Some(temp)
               token = new Token(BAD)
-              error("blbla", currentPos())
+              error("Bad Token", currentPos)
             }
           case '|' =>
-            val temp = getChar(source)
+            val temp = readChar(source)
             if (temp == '|') {
               token = new Token(OR)
-            }
-            else {
+            } else {
               droppedChar = Some(temp)
               token = new Token(BAD)
-              error("blbla", currentPos())
+              error("Bad Token", currentPos)
             }
           case '<' =>
             token = new Token(LESSTHAN)
@@ -129,55 +147,49 @@ object Lexer extends Pipeline[File, Iterator[Token]] {
           case '*' =>
             token = new Token(TIMES)
           case '/' =>
-            var temp = getChar(source)
+            var temp = readChar(source)
             if (temp == '/') {
-              temp = getChar(source)
+              temp = readChar(source)
               while (source.hasNext && temp != '\n') {
-                temp = getChar(source)
+                temp = readChar(source)
               }
               return readNextToken()
-            }
-            else if (temp == '*') {
+            } else if (temp == '*') {
 
-              temp = getChar(source)
-              var temp2 = getChar(source)
+              temp = readChar(source)
+              var temp2 = readChar(source)
 
               while (!(temp == '*' && temp2 == '/')) {
                 temp = temp2
-                temp2 = getChar(source)
+                temp2 = readChar(source)
               }
               return readNextToken()
-            }
-            else {
+            } else {
               droppedChar = Some(temp)
               token = new Token(DIV)
             }
           case '"' =>
-            val b: StringBuilder = new StringBuilder
-            var temp = getChar(source)
+            val builder: StringBuilder = new StringBuilder
+            var temp = readChar(source)
             while (source.hasNext && !(temp == '"') && temp != '\n') {
-              b.append(temp)
-              temp = getChar(source)
+              builder append temp
+              temp = readChar(source)
             }
             if (temp == '\n') {
               token = new Token(BAD)
-              error("blbla", currentPos())
-            }
-            else {
+              error("Bad Token", currentPos)
+            } else {
               token = new STRLIT(b.mkString)
             }
           case _ =>
             token = new Token(BAD)
-            error("Bad Token", currentPos())
+            error("Bad Token", currentPos)
         }
-
-
-      }
-      else {
-        p = source.pos
+      } else {
+        position = source.pos
         token = new Token(EOF)
       }
-      token.setPos(currentPos().file, p)
+      token.setPos(currentPos.file, position)
       token
     }
 
