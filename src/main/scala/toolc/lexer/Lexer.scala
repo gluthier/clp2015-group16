@@ -78,17 +78,15 @@ object Lexer extends Pipeline[File, Iterator[Token]] {
           }
         } else if (c.isDigit) {
           var k: Int = 0
-          while (source.hasNext && c.isDigit && c.asDigit == 0) {
-            c = readChar(source)
+          if (c.asDigit != 0) {
+              while (source.hasNext && c.isDigit) {
+                k = (10 * k) + c.asDigit
+                c = readChar(source)
+              }
+              if (!c.isDigit) {
+                droppedChar = Some(c)
+              }
           }
-          while (source.hasNext && c.isDigit) {
-            k = (10 * k) + c.asDigit
-            c = readChar(source)
-          }
-          if (!c.isDigit) {
-            droppedChar = Some(c)
-          }
-
           token = new INTLIT(k)
         } else if (c.isWhitespace) {
           return readNextToken()
