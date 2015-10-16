@@ -39,7 +39,14 @@ object Parser extends Pipeline[Iterator[Token], Program] {
     }
 
     def parseGoal: Program = {
-        new Program(parseMainObject, parseClassDecl)
+        val main = parseMainObject
+        val classes: List[ClassDecl] = Nil
+        while (currentToken.kind != EOF) {
+            classes :+ parseClassDecl
+        }
+        eat(EOF)
+        
+        new Program(main, classes)
     }
 
     def parseMainObject: MainObject = {
