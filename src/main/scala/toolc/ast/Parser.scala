@@ -27,7 +27,7 @@ object Parser extends Pipeline[Iterator[Token], Program] {
     // ''Eats'' the expected token, or terminates with an error.
     def eat(kind: TokenKind): Unit = {
       if(currentToken.kind == kind) {
-        readToken
+        readToken()
       } else {
         expected(kind)
       }
