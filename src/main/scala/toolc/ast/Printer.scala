@@ -6,132 +6,135 @@ import Trees._
 object Printer {
   def apply(t: Tree): String = {
       t match {
-          case Program =>
+          case x: Program =>
             val classes: StringBuilder = new StringBuilder
-            for (c <- t.classes) {
+            for (c <- x.classes) {
                 classes append apply(c) + "\n"
             }
-            apply(t.main) + "\n" + classes.mkString
-          case MainObject =>
+            apply(x.main) + "\n" + classes.mkString
+          case x: MainObject =>
             val stats: StringBuilder = new StringBuilder
-            for (s <- t.stats) {
+            for (s <- x.stats) {
                 stats append apply(s) + "\n"
             }
-            "object " + t.id + " {\n def main(): Unit = {" + stats.mkString + "}}"
-          case ClassDecl =>
+            "object " + x.id + " {\n def main(): Unit = {" + stats.mkString + "}}"
+          case x: ClassDecl =>
             val vars: StringBuilder = new StringBuilder
-            for (v <- t.vars) {
+            for (v <- x.vars) {
                 vars append apply(v) + "\n"
             }
             val meths: StringBuilder = new StringBuilder
-            for (m <- t.methods) {
+            for (m <- x.methods) {
                 meths append apply(m)
             }
-            t.parent match {
-                case Some(x) =>
-                    "class " + t.id + " extends " + t.parent + " {\n" + vars.mkString + "\n" + meths.mkString + "\n}"
+            val id: Identifier = x.id
+            x.parent match {
+                case Some(parent) =>
+                    "class " + id + " extends " + parent + " {\n" + vars.mkString + "\n" + meths.mkString + "\n}"
                 case None =>
-                    "class " + t.id + " {\n" + vars.mkString + "\n" + meths.mkString + "\n}"
+                    "class " + id + " {\n" + vars.mkString + "\n" + meths.mkString + "\n}"
             }
-          case VarDecl =>
-            "var " + apply(t.id) + ": " + apply(t.tpe) + ";"
-          case MethodDecl =>
+          case x: VarDecl =>
+            "var " + apply(x.id) + ": " + apply(x.tpe) + ";"
+          case x: MethodDecl =>
             val args: StringBuilder= new StringBuilder
-            if (t.args.length > 0) {
-                args append apply(t.args[0])
-                for (i <- 1 to t.args.length) {
-                    args append ", " + apply(t.args[i])
+            if (x.args.length > 0) {
+                args append apply(x.args.head)
+                for (a <- x.args.tail) {
+                    args append ", " + apply(a)
                 }
             }
             val vars: StringBuilder = new StringBuilder
-            for (v <- t.vars) {
+            for (v <- x.vars) {
                 vars append apply(v) + "\n"
             }
             val stats: StringBuilder = new StringBuilder
-            for (s <- t.stats) {
+            for (s <- x.stats) {
                 stats append apply(s) + "\n"
             }
 
-            "def " + t.id + "(" + args.mkString + "): " + t.retType + " = {\n" + vars.mkString + "\n" + stats.mkString + "\nreturn " + t.retExpr
-          case Formal =>
-            apply(t.id) + ": " + apply(t.tpe)
-          case IntArrayType =>
+            "def " + x.id + "(" + args.mkString + "): " + x.retType + " = {\n" + vars.mkString + "\n" + stats.mkString + "\nreturn " + x.retExpr
+          case x: Formal =>
+            apply(x.id) + ": " + apply(x.tpe)
+          case x: IntArrayType =>
             "Int[]"
-          case IntType =>
+          case x: IntType =>
             "Int"
-          case BooleanType =>
+          case x: BooleanType =>
             "Bool"
-          case StringType =>
+          case x: StringType =>
             "String"
-          case Block =>
+          case x: Block =>
             val stats: StringBuilder = new StringBuilder
-            for(s <- t.stats) {
+            for(s <- x.stats) {
                 stats append apply(s)
             }
             "{\n" + stats.mkString + "\n}"
-          case If =>
-            t.els match {
-                case Some(x) =>
-                  "if (" + apply(t.expr) + ") {\n" + apply(t.thn) + "\n} else {\n" + apply(t.els) + "\n}"
+          case x: If =>
+            val expr: ExprTree = x.expr
+            val thn: StatTree = x.thn
+            x.els match {
+                case Some(els) =>
+                  "if (" + apply(expr) + ") {\n" + apply(thn) + "\n} else {\n" + apply(els) + "\n}"
                 case None =>
-                  "if (" + apply(t.expr) + ") {\n" + apply(t.thn) + "\n}"
+                  "if (" + apply(expr) + ") {\n" + apply(thn) + "\n}"
             }
 
-          case While =>
-            "while (" + apply(t.expr) + ") {\n" + apply(t.stat) + "\n}"
-          case Println =>
-            "println(" + apply(t.expr) + ");"
-          case Assign =>
-            apply(t.id) + " = " + apply(t.expr) + ";"
-          case ArrayAssign =>
-            apply(t.id) + "[" + apply(t.index) + "]" + " = " + apply(t.expr) + ";"
-          case And =>
-            apply(t.lhs) + " && " + apply(t.rhs)
-          case Or =>
-            apply(t.lhs) + "|| " + apply(t.rhs)
-          case Plus =>
-            apply(t.lhs) + " + " + apply(t.rhs)
-          case Minus =>
-            apply(t.lhs) + " - " + apply(t.rhs)
-          case Times =>
-            apply(t.lhs) + " * " + apply(t.rhs)
-          case Div =>
-            apply(t.lhs) + " / " + apply(t.rhs)
-          case LessThan =>
-            apply(t.lhs) + " < " + apply(t.rhs)
-          case Equals =>
-            apply(t.lhs) + " == " + apply(t.rhs)
-          case ArrayRead =>
-            apply(t.arr) + "[" + apply(t.index) + "]"
-          case ArrayLength =>
-            apply(t.arr) + ".length"
-          case MethodCall =>
+          case x: While =>
+            "while (" + apply(x.expr) + ") {\n" + apply(x.stat) + "\n}"
+          case x: Println =>
+            "println(" + apply(x.expr) + ");"
+          case x: Assign =>
+            apply(x.id) + " = " + apply(x.expr) + ";"
+          case x: ArrayAssign =>
+            apply(x.id) + "[" + apply(x.index) + "]" + " = " + apply(x.expr) + ";"
+          case x: And =>
+            apply(x.lhs) + " && " + apply(x.rhs)
+          case x: Or =>
+            apply(x.lhs) + "|| " + apply(x.rhs)
+          case x: Plus =>
+            apply(x.lhs) + " + " + apply(x.rhs)
+          case x: Minus =>
+            apply(x.lhs) + " - " + apply(x.rhs)
+          case x: Times =>
+            apply(x.lhs) + " * " + apply(x.rhs)
+          case x: Div =>
+            apply(x.lhs) + " / " + apply(x.rhs)
+          case x: LessThan =>
+            apply(x.lhs) + " < " + apply(x.rhs)
+          case x: Equals =>
+            apply(x.lhs) + " == " + apply(x.rhs)
+          case x: ArrayRead =>
+            apply(x.arr) + "[" + apply(x.index) + "]"
+          case x: ArrayLength =>
+            apply(x.arr) + ".length"
+          case x: MethodCall =>
             val args: StringBuilder = new StringBuilder
-            if (t.args.length > 0) {
-                args append apply(t.args[0])
-                for (i <- 1 to t.args.length) {
-                    args append ", " + apply(t.args[i])
+            if (x.args.length > 0) {
+                args append apply(x.args.head)
+                for (a <- x.args.tail) {
+                    args append ", " + apply(a)
                 }
             }
-            apply(t.obj) + "." + apply(t.meth) + "(" + args.mkString+ ")"
-          case IntLit =>
-            t.value
-          case StringLit =>
-            t.value
-          case True =>
+            apply(x.obj) + "." + apply(x.meth) + "(" + args.mkString+ ")"
+          case x: IntLit =>
+            x.value.toString
+          case x: StringLit =>
+            x.value
+          case x: True =>
             "true"
-          case False =>
+          case x: False =>
             "false"
-          case Identifier =>
-            t.value
-          case This =>
+          case x: Identifier =>
+            x.value
+          case x: This =>
             "this"
-          case NewIntArray =>
-            "new Int [" + apply(t.size) +  "]"
-          case New =>
-            "new " + apply(t.tpe) + "()"
-          case Not =>
-            "!" + apply(t.expr)
+          case x: NewIntArray =>
+            "new Int [" + apply(x.size) +  "]"
+          case x: New =>
+            "new " + apply(x.tpe) + "()"
+          case x: Not =>
+            "!" + apply(x.expr)
           case _ => error("error")
       }
   }

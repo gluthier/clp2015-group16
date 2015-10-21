@@ -45,7 +45,7 @@ object Parser extends Pipeline[Iterator[Token], Program] {
             classes :+ parseClassDecl
         }
         eat(EOF)
-        
+
         new Program(main, classes)
     }
 
@@ -74,14 +74,14 @@ object Parser extends Pipeline[Iterator[Token], Program] {
     def parseClassDecl: ClassDecl = {
         eat(CLASS)
         val id = parseIdentifier
-        val parent = currentToken match {
+        val parent = currentToken.kind match {
             case EXTENDS =>
                 eat(EXTENDS)
-                parseIdentifier
+                Some(parseIdentifier)
             case _ => None
         }
         eat(LBRACE)
-        val vars = List[VarDeclaration] = Nil
+        val vars: List[VarDecl] = Nil
         while (currentToken.kind == VAR) {
             vars :+ parseVarDecl
         }
@@ -94,7 +94,7 @@ object Parser extends Pipeline[Iterator[Token], Program] {
         new ClassDecl(id, parent, vars, methods)
     }
 
-    def parseVarDecl: VarDeclaration = {
+    def parseVarDecl: VarDecl = {
         eat(VAR)
         val id = parseIdentifier
         eat(COLON)
@@ -124,10 +124,10 @@ object Parser extends Pipeline[Iterator[Token], Program] {
         }
         eat(RPAREN)
         eat(COLON)
-        val tpe = parseType
+        val retType = parseType
         eat(EQSIGN)
         eat(LBRACE)
-        val vars: List[VarDeclaration] = Nil
+        val vars: List[VarDecl] = Nil
         while (currentToken.kind == VAR) {
             vars :+ parseVarDecl
         }
@@ -144,10 +144,10 @@ object Parser extends Pipeline[Iterator[Token], Program] {
     }
 
     def parseType: TypeTree = {
-        currentToken match {
+        currentToken.kind match {
             case INT =>
                 eat(INT)
-                currentToken match {
+                currentToken.kind match {
                     case LBRACKET =>
                         eat(LBRACKET)
                         eat(RBRACKET)
@@ -161,13 +161,13 @@ object Parser extends Pipeline[Iterator[Token], Program] {
                 eat(STRING)
                 new StringType()
             case _ =>
-                val value = parseIdentifier
-                new Identifier(value)
+                val id = parseIdentifier
+                new Identifier(id.value)
         }
     }
 
     def parseStatement: StatTree = {
-        currentToken match {
+        currentToken.kind match {
             case LBRACE =>
                 eat(LBRACE)
                 val stats: List[StatTree] = Nil
@@ -182,20 +182,20 @@ object Parser extends Pipeline[Iterator[Token], Program] {
                 val expr = parseExpression
                 eat(RPAREN)
                 val thn = parseStatement
-                val els = currentToken match {
+                val els = currentToken.kind match {
                     case ELSE =>
                         eat(ELSE)
-                        parseStatement
+                        Some(parseStatement)
                     case _ => None
                 }
-                new IF(expr, thn, els)
+                new If(expr, thn, els)
             case WHILE =>
                 eat(WHILE)
                 eat(LPAREN)
                 val expr = parseExpression
                 eat(RPAREN)
                 val stat = parseStatement
-                new WHILE(expr, stat)
+                new While(expr, stat)
             case PRINTLN =>
                 eat(PRINTLN)
                 eat(LPAREN)
@@ -205,7 +205,7 @@ object Parser extends Pipeline[Iterator[Token], Program] {
                 new Println(expr)
             case _ =>
                 val id = parseIdentifier
-                currentToken match {
+                currentToken.kind match {
                     case EQSIGN =>
                         eat(EQSIGN)
                         val expr = parseExpression
@@ -219,19 +219,19 @@ object Parser extends Pipeline[Iterator[Token], Program] {
                         val expr = parseExpression
                         eat(SEMICOLON)
                         new ArrayAssign(id, index, expr)
-                    case _ => error("error")
+                    case _ => fatal("error")
                 }
         }
     }
 
     def parseExpression: ExprTree = {
-        currentToken match {
-            case INTLITKIND =>
-                val value = currentToken.value
+        currentToken.kind match {
+            case x: INTLIT =>
+                val value = x.value
                 eat(INTLITKIND)
                 new IntLit(value)
-            case STRLITKIND =>
-                val value = currentToken.value
+            case x: STRLIT =>
+                val value = x.value
                 eat(STRLITKIND)
                 new StringLit(value)
             case TRUE =>
@@ -247,7 +247,7 @@ object Parser extends Pipeline[Iterator[Token], Program] {
                 new This()
             case NEW =>
                 eat(NEW)
-                currentToken match {
+                currentToken.kind match {
                     case INT =>
                         eat(INT)
                         eat(LBRACKET)
@@ -271,7 +271,7 @@ object Parser extends Pipeline[Iterator[Token], Program] {
                 expr
             case _ =>
                 val lhs = parseExpression
-                currentToken match {
+                currentToken.kind match {
                     case TIMES =>
                         eat(TIMES)
                         val rhs = parseExpression
@@ -312,7 +312,7 @@ object Parser extends Pipeline[Iterator[Token], Program] {
                         new ArrayRead(arr, index)
                     case DOT =>
                         eat(DOT)
-                        currentToken match {
+                        currentToken.kind match {
                             case LENGTH =>
                                 val arr = lhs
                                 eat(LENGTH)
@@ -331,18 +331,19 @@ object Parser extends Pipeline[Iterator[Token], Program] {
                                 }
                                 eat(RPAREN)
                                 new MethodCall(obj, meth, args)
+                            case _ => fatal("error")
                         }
                 }
         }
     }
 
     def parseIdentifier: Identifier = {
-        currentToken match {
-            case IDKIND =>
-                val value = currentToken.value
+        currentToken.kind match {
+            case x: ID =>
+                val value = x.value
                 eat(IDKIND)
                 new Identifier(value)
-            case _ => erro("error")
+            case _ => fatal("error")
         }
     }
 
