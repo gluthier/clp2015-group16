@@ -13,13 +13,13 @@ object Parser extends Pipeline[Iterator[Token], Program] {
     // Store the current token, as read from the lexer.
     var currentToken: Token = new Token(BAD)
 
-    def readToken: Unit = {
+    def readToken(): Unit = {
       if (tokens.hasNext) {
-        currentToken = tokens.next
+        currentToken = tokens.next()
 
         // skips bad tokens
         while(currentToken.kind == BAD && tokens.hasNext) {
-          currentToken = tokens.next
+          currentToken = tokens.next()
         }
       }
     }

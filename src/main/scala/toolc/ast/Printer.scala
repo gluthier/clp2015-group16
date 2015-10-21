@@ -38,7 +38,7 @@ object Printer {
             "var " + apply(x.id) + ": " + apply(x.tpe) + ";"
           case x: MethodDecl =>
             val args: StringBuilder= new StringBuilder
-            if (x.args.length > 0) {
+            if (x.args.nonEmpty) {
                 args append apply(x.args.head)
                 for (a <- x.args.tail) {
                     args append ", " + apply(a)
@@ -110,7 +110,7 @@ object Printer {
             apply(x.arr) + ".length"
           case x: MethodCall =>
             val args: StringBuilder = new StringBuilder
-            if (x.args.length > 0) {
+            if (x.args.nonEmpty) {
                 args append apply(x.args.head)
                 for (a <- x.args.tail) {
                     args append ", " + apply(a)
@@ -135,7 +135,7 @@ object Printer {
             "new " + apply(x.tpe) + "()"
           case x: Not =>
             "!" + apply(x.expr)
-          case _ => error("error")
+          case _ => sys.error("error")
       }
   }
 }
