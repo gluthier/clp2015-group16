@@ -160,7 +160,7 @@ object Lexer extends Pipeline[File, Iterator[Token]] {
               temp = readChar(source)
               var temp2 = readChar(source)
 
-              while (!(temp == '*' && temp2 == '/')) {
+              while (temp != '*' || temp2 != '/') {
                 temp = temp2
                 temp2 = readChar(source)
               }
@@ -172,7 +172,7 @@ object Lexer extends Pipeline[File, Iterator[Token]] {
           case '"' =>
             val builder: StringBuilder = new StringBuilder
             var temp = readChar(source)
-            while (source.hasNext && !(temp == '"') && temp != '\n') {
+            while (source.hasNext && temp != '"' && temp != '\n') {
               builder append temp
               temp = readChar(source)
             }

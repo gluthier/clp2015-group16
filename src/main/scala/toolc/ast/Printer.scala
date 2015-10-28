@@ -136,7 +136,6 @@ object Printer extends Pipeline[Program, String] {
         "new " + apply(x.tpe) + "()"
       case x: Not =>
         "!" + apply(x.expr)
-      case _ => sys.error("error")
     }
   }
   def run(ctx: Context)(v: Program): String = apply(v)

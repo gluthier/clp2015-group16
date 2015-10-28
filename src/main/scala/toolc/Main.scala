@@ -25,18 +25,18 @@ object Main {
     val ctx = processOptions(args)
 
     val pipeline = Lexer andThen
-      Parser andThen
+      Parser /*andThen
       Printer andThen
       StringToFile andThen
       Lexer andThen
       Parser andThen
-      Printer
+      Printer*/
 
     val result = pipeline.run(ctx)(ctx.file)
 
     ctx.reporter.terminateIfErrors
 
-    // println(Printer(result))
-    println(result)
+    println(Printer(result))
+    //println(result)
   }
 }
