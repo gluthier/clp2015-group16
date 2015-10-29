@@ -40,13 +40,12 @@ object Parser extends Pipeline[Iterator[Token], Program] {
 
     def parseGoal: Program = {
         val main = parseMainObject
-        val classes: List[ClassDecl] = Nil
+        var classes: List[ClassDecl] = Nil
         while (currentToken.kind != EOF) {
-            classes :+ parseClassDecl
+            classes = parseClassDecl :: classes
         }
         eat(EOF)
-
-        new Program(main, classes)
+        new Program(main, classes.reverse)
     }
 
     def parseMainObject: MainObject = {
@@ -61,14 +60,13 @@ object Parser extends Pipeline[Iterator[Token], Program] {
         eat(UNIT)
         eat(EQSIGN)
         eat(LBRACE)
-        val stats: List[StatTree] = Nil
+        var stats: List[StatTree] = Nil
         while (currentToken.kind != RBRACE) {
-            stats :+ parseStatement
+            stats = parseStatement :: stats
         }
         eat(RBRACE)
         eat(RBRACE)
-
-        new MainObject(id, stats)
+        new MainObject(id, stats.reverse)
     }
 
     def parseClassDecl: ClassDecl = {
@@ -81,17 +79,16 @@ object Parser extends Pipeline[Iterator[Token], Program] {
             case _ => None
         }
         eat(LBRACE)
-        val vars: List[VarDecl] = Nil
+        var vars: List[VarDecl] = Nil
         while (currentToken.kind == VAR) {
-            vars :+ parseVarDecl
+            vars = parseVarDecl :: vars
         }
-        val methods: List[MethodDecl] = Nil
+        var methods: List[MethodDecl] = Nil
         while (currentToken.kind == DEF) {
-            methods :+ parseMethodDecl
+            methods = parseMethodDecl :: methods
         }
         eat(RBRACE)
-
-        new ClassDecl(id, parent, vars, methods)
+        new ClassDecl(id, parent, vars.reverse, methods.reverse)
     }
 
     def parseVarDecl: VarDecl = {
@@ -100,7 +97,6 @@ object Parser extends Pipeline[Iterator[Token], Program] {
         eat(COLON)
         val tpe = parseType
         eat(SEMICOLON)
-
         new VarDecl(tpe, id)
     }
 
@@ -108,18 +104,18 @@ object Parser extends Pipeline[Iterator[Token], Program] {
         eat(DEF)
         val id = parseIdentifier
         eat(LPAREN)
-        val args: List[Formal] = Nil
+        var args: List[Formal] = Nil
         if (currentToken.kind == IDKIND) {
             val id = parseIdentifier
             eat(COLON)
             val tpe = parseType
-            args :+ new Formal(tpe, id)
+            args = new Formal(tpe, id) :: args
             while (currentToken.kind == COMMA) {
                 eat(COMMA)
                 val id = parseIdentifier
                 eat(COLON)
                 val tpe = parseType
-                args :+ new Formal(tpe, id)
+                args = new Formal(tpe, id) :: args
             }
         }
         eat(RPAREN)
@@ -127,20 +123,19 @@ object Parser extends Pipeline[Iterator[Token], Program] {
         val retType = parseType
         eat(EQSIGN)
         eat(LBRACE)
-        val vars: List[VarDecl] = Nil
+        var vars: List[VarDecl] = Nil
         while (currentToken.kind == VAR) {
-            vars :+ parseVarDecl
+            vars = parseVarDecl :: vars
         }
-        val stats: List[StatTree] = Nil
+        var stats: List[StatTree] = Nil
         while (currentToken.kind != RETURN) {
-            stats :+ parseStatement
+            stats = parseStatement :: stats
         }
         eat(RETURN)
         val retExpr = parseExpression
         eat(SEMICOLON)
         eat(RBRACE)
-
-        new MethodDecl(retType, id, args, vars, stats, retExpr)
+        new MethodDecl(retType, id, args.reverse, vars.reverse, stats.reverse, retExpr)
     }
 
     def parseType: TypeTree = {
@@ -170,12 +165,12 @@ object Parser extends Pipeline[Iterator[Token], Program] {
         currentToken.kind match {
             case LBRACE =>
                 eat(LBRACE)
-                val stats: List[StatTree] = Nil
+                var stats: List[StatTree] = Nil
                 while (currentToken.kind != RBRACE) {
-                    stats :+ parseStatement
+                    stats = parseStatement :: stats
                 }
                 eat(RBRACE)
-                new Block(stats)
+                new Block(stats.reverse)
             case IF =>
                 eat(IF)
                 eat(LPAREN)
@@ -278,16 +273,16 @@ object Parser extends Pipeline[Iterator[Token], Program] {
                                     val obj = lhs
                                     val meth = parseIdentifier
                                     eat(LPAREN)
-                                    val args: List[ExprTree] = Nil
+                                    var args: List[ExprTree] = Nil
                                     if (currentToken.kind != RPAREN) {
-                                        args :+ parseExpression
+                                        args = parseExpression :: args
                                         while (currentToken.kind == COMMA) {
                                             eat(COMMA)
-                                            args :+ parseExpression
+                                            args = parseExpression :: args
                                         }
                                     }
                                     eat(RPAREN)
-                                    parseExpr(Some(new MethodCall(obj, meth, args)))
+                                    parseExpr(Some(new MethodCall(obj, meth, args.reverse)))
                                 case _ => expected(LENGTH, IDKIND)
                             }
                         case _ => lhs //the whole expression has been parsed

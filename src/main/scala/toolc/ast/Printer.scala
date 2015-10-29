@@ -7,135 +7,131 @@ import toolc.utils.{Context, Pipeline}
 object Printer extends Pipeline[Program, String] {
   def apply(t: Tree): String = {
     t match {
-      case x: Program =>
-        val classes: StringBuilder = new StringBuilder
-        for (c <- x.classes) {
-          classes append apply(c) + "\n"
+      case Program(main, classes) =>
+        val builder: StringBuilder = new StringBuilder
+        for (c <- classes) {
+            builder.append(apply(c) + "\n")
         }
-        apply(x.main) + "\n" + classes.mkString
-      case x: MainObject =>
-        val stats: StringBuilder = new StringBuilder
-        for (s <- x.stats) {
-          stats append apply(s) + "\n"
+        apply(main) + "\n" + builder.mkString
+      case MainObject(id, stats) =>
+        val builder: StringBuilder = new StringBuilder
+        for (s <- stats) {
+            builder.append(apply(s) + "\n")
         }
-        "object " + x.id + " {\n def main(): Unit = {" + stats.mkString + "}}"
-      case x: ClassDecl =>
-        val vars: StringBuilder = new StringBuilder
-        for (v <- x.vars) {
-          vars append apply(v) + "\n"
+        "object " + apply(id) + " {\ndef main(): Unit = {\n" + builder.mkString + "}\n}"
+      case ClassDecl(id, parent, vars, methods) =>
+        val builder_vars: StringBuilder = new StringBuilder
+        for (v <- vars) {
+            builder_vars.append(apply(v) + "\n")
         }
-        val meths: StringBuilder = new StringBuilder
-        for (m <- x.methods) {
-          meths append apply(m)
+        val builder_meths: StringBuilder = new StringBuilder
+        for (m <- methods) {
+            builder_meths.append(apply(m))
         }
-        val id: Identifier = x.id
-        x.parent match {
+        parent match {
           case Some(parent) =>
-            "class " + id + " extends " + parent + " {\n" + vars.mkString + "\n" + meths.mkString + "\n}"
+            "class " + apply(id) + " extends " + apply(parent) + " {\n" + builder_vars.mkString + "\n" + builder_meths.mkString + "\n}"
           case None =>
-            "class " + id + " {\n" + vars.mkString + "\n" + meths.mkString + "\n}"
+            "class " + apply(id) + " {\n" + builder_vars.mkString + "\n" + builder_meths.mkString + "\n}"
         }
-      case x: VarDecl =>
-        "var " + apply(x.id) + ": " + apply(x.tpe) + ";"
-      case x: MethodDecl =>
-        val args: StringBuilder = new StringBuilder
-        if (x.args.nonEmpty) {
-          args append apply(x.args.head)
-          for (a <- x.args.tail) {
-            args append ", " + apply(a)
+      case VarDecl(tpe, id) =>
+        "var " + apply(id) + ": " + apply(tpe) + ";"
+      case MethodDecl(retType, id, args, vars, stats, retExpr) =>
+        val builder_args: StringBuilder = new StringBuilder
+        if (args.nonEmpty) {
+            builder_args.append(apply(args.head))
+          for (a <- args.tail) {
+              builder_args.append(", " + apply(a))
           }
         }
-        val vars: StringBuilder = new StringBuilder
-        for (v <- x.vars) {
-          vars append apply(v) + "\n"
+        val builder_vars: StringBuilder = new StringBuilder
+        for (v <- vars) {
+            builder_vars.append(apply(v) + "\n")
         }
-        val stats: StringBuilder = new StringBuilder
-        for (s <- x.stats) {
-          stats append apply(s) + "\n"
+        val builder_stats: StringBuilder = new StringBuilder
+        for (s <- stats) {
+            builder_stats.append(apply(s) + "\n")
         }
 
-        "def " + x.id + "(" + args.mkString + "): " + x.retType + " = {\n" + vars.mkString + "\n" + stats.mkString + "\nreturn " + x.retExpr
-      case x: Formal =>
-        apply(x.id) + ": " + apply(x.tpe)
-      case x: IntArrayType =>
+        "def " + apply(id) + "(" + builder_args.mkString + "): " + apply(retType) + " = {\n" + builder_vars.mkString + "\n" + builder_stats.mkString + "\nreturn " + apply(retExpr)
+      case Formal(tpe, id) =>
+        apply(id) + ": " + apply(tpe)
+      case IntArrayType() =>
         "Int[]"
-      case x: IntType =>
+      case IntType() =>
         "Int"
-      case x: BooleanType =>
+      case BooleanType() =>
         "Bool"
-      case x: StringType =>
+      case StringType() =>
         "String"
-      case x: Block =>
-        val stats: StringBuilder = new StringBuilder
-        for (s <- x.stats) {
-          stats append apply(s)
+      case Block(stats) =>
+        val builder_stats: StringBuilder = new StringBuilder
+        for (s <- stats) {
+            builder_stats.append(apply(s))
         }
-        "{\n" + stats.mkString + "\n}"
-      case x: If =>
-        val expr: ExprTree = x.expr
-        val thn: StatTree = x.thn
-        x.els match {
+        "{\n" + builder_stats.mkString + "\n}"
+      case If(expr, thn, els) =>
+        els match {
           case Some(els) =>
             "if (" + apply(expr) + ") {\n" + apply(thn) + "\n} else {\n" + apply(els) + "\n}"
           case None =>
             "if (" + apply(expr) + ") {\n" + apply(thn) + "\n}"
         }
-
-      case x: While =>
-        "while (" + apply(x.expr) + ") {\n" + apply(x.stat) + "\n}"
-      case x: Println =>
-        "println(" + apply(x.expr) + ");"
-      case x: Assign =>
-        apply(x.id) + " = " + apply(x.expr) + ";"
-      case x: ArrayAssign =>
-        apply(x.id) + "[" + apply(x.index) + "]" + " = " + apply(x.expr) + ";"
-      case x: And =>
-        apply(x.lhs) + " && " + apply(x.rhs)
-      case x: Or =>
-        apply(x.lhs) + "|| " + apply(x.rhs)
-      case x: Plus =>
-        apply(x.lhs) + " + " + apply(x.rhs)
-      case x: Minus =>
-        apply(x.lhs) + " - " + apply(x.rhs)
-      case x: Times =>
-        apply(x.lhs) + " * " + apply(x.rhs)
-      case x: Div =>
-        apply(x.lhs) + " / " + apply(x.rhs)
-      case x: LessThan =>
-        apply(x.lhs) + " < " + apply(x.rhs)
-      case x: Equals =>
-        apply(x.lhs) + " == " + apply(x.rhs)
-      case x: ArrayRead =>
-        apply(x.arr) + "[" + apply(x.index) + "]"
-      case x: ArrayLength =>
-        apply(x.arr) + ".length"
-      case x: MethodCall =>
-        val args: StringBuilder = new StringBuilder
-        if (x.args.nonEmpty) {
-          args append apply(x.args.head)
-          for (a <- x.args.tail) {
-            args append ", " + apply(a)
+      case While(expr, stat) =>
+        "while (" + apply(expr) + ") {\n" + apply(stat) + "\n}"
+      case Println(expr) =>
+        "println(" + apply(expr) + ");"
+      case Assign(id, expr) =>
+        apply(id) + " = " + apply(expr) + ";"
+      case ArrayAssign(id, index, expr) =>
+        apply(id) + "[" + apply(index) + "]" + " = " + apply(expr) + ";"
+      case And(lhs, rhs) =>
+        apply(lhs) + " && " + apply(rhs)
+      case Or(lhs, rhs) =>
+        apply(lhs) + "|| " + apply(rhs)
+      case Plus(lhs, rhs) =>
+        apply(lhs) + " + " + apply(rhs)
+      case Minus(lhs, rhs) =>
+        apply(lhs) + " - " + apply(rhs)
+      case Times(lhs, rhs) =>
+        apply(lhs) + " * " + apply(rhs)
+      case Div(lhs, rhs) =>
+        apply(lhs) + " / " + apply(rhs)
+      case LessThan(lhs, rhs) =>
+        apply(lhs) + " < " + apply(rhs)
+      case Equals(lhs, rhs) =>
+        apply(lhs) + " == " + apply(rhs)
+      case ArrayRead(arr, index) =>
+        apply(arr) + "[" + apply(index) + "]"
+      case ArrayLength(arr) =>
+        apply(arr) + ".length"
+      case MethodCall(obj, meth, args) =>
+        val builder_args: StringBuilder = new StringBuilder
+        if (args.nonEmpty) {
+            builder_args.append(apply(args.head))
+          for (a <- args.tail) {
+              builder_args.append(", " + apply(a))
           }
         }
-        apply(x.obj) + "." + apply(x.meth) + "(" + args.mkString + ")"
-      case x: IntLit =>
-        x.value.toString
-      case x: StringLit =>
-        x.value
-      case x: True =>
+        apply(obj) + "." + apply(meth) + "(" + builder_args.mkString + ")"
+      case IntLit(value) =>
+        value.toString
+      case StringLit(value) =>
+        "\"" + value + "\""
+      case True() =>
         "true"
-      case x: False =>
+      case False() =>
         "false"
-      case x: Identifier =>
-        x.value
-      case x: This =>
+      case Identifier(value) =>
+        value
+      case This() =>
         "this"
-      case x: NewIntArray =>
-        "new Int [" + apply(x.size) + "]"
-      case x: New =>
-        "new " + apply(x.tpe) + "()"
-      case x: Not =>
-        "!" + apply(x.expr)
+      case NewIntArray(size) =>
+        "new Int [" + apply(size) + "]"
+      case New(tpe) =>
+        "new " + apply(tpe) + "()"
+      case Not(expr) =>
+        "!" + apply(expr)
     }
   }
   def run(ctx: Context)(v: Program): String = apply(v)
