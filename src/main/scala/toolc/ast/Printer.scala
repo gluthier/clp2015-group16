@@ -26,13 +26,13 @@ object Printer extends Pipeline[Program, String] {
         }
         val builder_meths: StringBuilder = new StringBuilder
         for (m <- methods) {
-            builder_meths.append(apply(m))
+            builder_meths.append(apply(m) + "\n")
         }
         parent match {
           case Some(parent) =>
-            "class " + apply(id) + " extends " + apply(parent) + " {\n" + builder_vars.mkString + "\n" + builder_meths.mkString + "\n}"
+            "class " + apply(id) + " extends " + apply(parent) + " {\n" + builder_vars.mkString + builder_meths.mkString + "}"
           case None =>
-            "class " + apply(id) + " {\n" + builder_vars.mkString + "\n" + builder_meths.mkString + "\n}"
+            "class " + apply(id) + " {\n" + builder_vars.mkString + builder_meths.mkString + "}"
         }
       case VarDecl(tpe, id) =>
         "var " + apply(id) + ": " + apply(tpe) + ";"
@@ -53,7 +53,7 @@ object Printer extends Pipeline[Program, String] {
             builder_stats.append(apply(s) + "\n")
         }
 
-        "def " + apply(id) + "(" + builder_args.mkString + "): " + apply(retType) + " = {\n" + builder_vars.mkString + "\n" + builder_stats.mkString + "\nreturn " + apply(retExpr)
+        "def " + apply(id) + "(" + builder_args.mkString + "): " + apply(retType) + " = {\n" + builder_vars.mkString + builder_stats.mkString + "return " + apply(retExpr) + ";\n}\n"
       case Formal(tpe, id) =>
         apply(id) + ": " + apply(tpe)
       case IntArrayType() =>
@@ -67,18 +67,18 @@ object Printer extends Pipeline[Program, String] {
       case Block(stats) =>
         val builder_stats: StringBuilder = new StringBuilder
         for (s <- stats) {
-            builder_stats.append(apply(s))
+            builder_stats.append(apply(s) + "\n")
         }
-        "{\n" + builder_stats.mkString + "\n}"
+        builder_stats.mkString
       case If(expr, thn, els) =>
         els match {
           case Some(els) =>
-            "if (" + apply(expr) + ") {\n" + apply(thn) + "\n} else {\n" + apply(els) + "\n}"
+            "if (" + apply(expr) + ") {\n" + apply(thn) + "} else {\n" + apply(els) + "}"
           case None =>
-            "if (" + apply(expr) + ") {\n" + apply(thn) + "\n}"
+            "if (" + apply(expr) + ") {\n" + apply(thn) + "}"
         }
       case While(expr, stat) =>
-        "while (" + apply(expr) + ") {\n" + apply(stat) + "\n}"
+        "while (" + apply(expr) + ") {\n" + apply(stat) + "}"
       case Println(expr) =>
         "println(" + apply(expr) + ");"
       case Assign(id, expr) =>
@@ -86,21 +86,21 @@ object Printer extends Pipeline[Program, String] {
       case ArrayAssign(id, index, expr) =>
         apply(id) + "[" + apply(index) + "]" + " = " + apply(expr) + ";"
       case And(lhs, rhs) =>
-        apply(lhs) + " && " + apply(rhs)
+        "(" + apply(lhs) + " && " + apply(rhs) + ")"
       case Or(lhs, rhs) =>
-        apply(lhs) + "|| " + apply(rhs)
+        "(" + apply(lhs) + "|| " + apply(rhs) + ")"
       case Plus(lhs, rhs) =>
-        apply(lhs) + " + " + apply(rhs)
+        "(" + apply(lhs) + " + " + apply(rhs) + ")"
       case Minus(lhs, rhs) =>
-        apply(lhs) + " - " + apply(rhs)
+        "(" + apply(lhs) + " - " + apply(rhs) + ")"
       case Times(lhs, rhs) =>
-        apply(lhs) + " * " + apply(rhs)
+        "(" + apply(lhs) + " * " + apply(rhs) + ")"
       case Div(lhs, rhs) =>
-        apply(lhs) + " / " + apply(rhs)
+        "(" + apply(lhs) + " / " + apply(rhs) + ")"
       case LessThan(lhs, rhs) =>
-        apply(lhs) + " < " + apply(rhs)
+        "(" + apply(lhs) + " < " + apply(rhs) + ")"
       case Equals(lhs, rhs) =>
-        apply(lhs) + " == " + apply(rhs)
+        "(" + apply(lhs) + " == " + apply(rhs) + ")"
       case ArrayRead(arr, index) =>
         apply(arr) + "[" + apply(index) + "]"
       case ArrayLength(arr) =>
@@ -131,7 +131,7 @@ object Printer extends Pipeline[Program, String] {
       case New(tpe) =>
         "new " + apply(tpe) + "()"
       case Not(expr) =>
-        "!" + apply(expr)
+        "!(" + apply(expr) + ")"
     }
   }
   def run(ctx: Context)(v: Program): String = apply(v)
