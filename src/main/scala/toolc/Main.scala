@@ -6,6 +6,7 @@ import java.io.File
 import lexer._
 import ast._
 import eval._
+import analyzer._
 
 object Main {
 
@@ -25,12 +26,13 @@ object Main {
     val ctx = processOptions(args)
 
     val pipeline = Lexer andThen
-      Parser /*andThen
-      Printer andThen
+      Parser andThen
+      /* Printer andThen
       StringToFile andThen
       Lexer andThen
       Parser andThen
-      Printer*/
+      Printer andThen */
+      NameAnalysis
 
     val result = pipeline.run(ctx)(ctx.file)
 
