@@ -219,130 +219,161 @@ object Parser extends Pipeline[Iterator[Token], Program] {
         }
     }
 
-    def parseExpression: ExprTree = {
-        def parseExpr(lhsExpr: Option[ExprTree]): ExprTree = {
-            lhsExpr match {
-                case Some(lhs) =>
-                    currentToken.kind match {
-                        case TIMES =>
-                            eat(TIMES)
-                            val rhs = parseExpression
-                            parseExpr(Some(new Times(lhs, rhs)))
-                        case DIV =>
-                            eat(DIV)
-                            val rhs = parseExpression
-                            parseExpr(Some(new Div(lhs, rhs)))
-                        case PLUS =>
-                            eat(PLUS)
-                            val rhs = parseExpression
-                            parseExpr(Some(new Plus(lhs, rhs)))
-                        case MINUS =>
-                            eat(MINUS)
-                            val rhs = parseExpression
-                            parseExpr(Some(new Minus(lhs, rhs)))
-                        case LESSTHAN =>
-                            eat(LESSTHAN)
-                            val rhs = parseExpression
-                            parseExpr(Some(new LessThan(lhs, rhs)))
-                        case EQUALS =>
-                            eat(EQUALS)
-                            val rhs = parseExpression
-                            parseExpr(Some(new Equals(lhs, rhs)))
-                        case AND =>
-                            eat(AND)
-                            val rhs = parseExpression
-                            parseExpr(Some(new And(lhs, rhs)))
-                        case OR =>
-                            eat(OR)
-                            val rhs = parseExpression
-                            parseExpr(Some(new Or(lhs, rhs)))
-                        case LBRACKET =>
-                            val arr = lhs
-                            eat(LBRACKET)
-                            val index = parseExpression
-                            eat(RBRACKET)
-                            parseExpr(Some(new ArrayRead(arr, index)))
-                        case DOT =>
-                            eat(DOT)
-                            currentToken.kind match {
-                                case LENGTH =>
-                                    val arr = lhs
-                                    eat(LENGTH)
-                                    parseExpr(Some(new ArrayLength(arr)))
-                                case IDKIND =>
-                                    val obj = lhs
-                                    val meth = parseIdentifier
-                                    eat(LPAREN)
-                                    var args: List[ExprTree] = Nil
-                                    if (currentToken.kind != RPAREN) {
-                                        args = parseExpression :: args
-                                        while (currentToken.kind == COMMA) {
-                                            eat(COMMA)
-                                            args = parseExpression :: args
-                                        }
-                                    }
-                                    eat(RPAREN)
-                                    parseExpr(Some(new MethodCall(obj, meth, args.reverse)))
-                                case _ => expected(LENGTH, IDKIND)
-                            }
-                        case _ => lhs //the whole expression has been parsed
-                    }
-                case None =>
-                    currentToken match {
-                        case x: INTLIT =>
-                            val value = x.value
-                            eat(INTLITKIND)
-                            parseExpr(Some(new IntLit(value)))
-                        case x: STRLIT =>
-                            val value = x.value
-                            eat(STRLITKIND)
-                            parseExpr(Some(new StringLit(value)))
-                        case x: ID =>
-                            val value = x.value
-                            eat(IDKIND)
-                            parseExpr(Some(new Identifier(value)))
-                        case _ =>
-                            currentToken.kind match {
-                                case TRUE =>
-                                    eat(TRUE)
-                                    parseExpr(Some(new True()))
-                                case FALSE =>
-                                    eat(FALSE)
-                                    parseExpr(Some(new False()))
-                                case THIS =>
-                                    eat(THIS)
-                                    parseExpr(Some(new This()))
-                                case NEW =>
-                                    eat(NEW)
-                                    currentToken.kind match {
-                                        case INT =>
-                                            eat(INT)
-                                            eat(LBRACKET)
-                                            val expr = parseExpression
-                                            eat(RBRACKET)
-                                            parseExpr(Some(new NewIntArray(expr)))
-                                        case _ =>
-                                            val tpe = parseIdentifier
-                                            eat(LPAREN)
-                                            eat(RPAREN)
-                                            parseExpr(Some(new New(tpe)))
-                                    }
-                                case BANG =>
-                                    eat(BANG)
-                                    val expr = parseExpression
-                                    parseExpr(Some(new Not(expr)))
-                                case LPAREN =>
-                                    eat(LPAREN)
-                                    val expr = parseExpression
-                                    eat(RPAREN)
-                                    parseExpr(Some(expr))
-                                case _ => expected(INTLITKIND, STRLITKIND, IDKIND, TRUE, FALSE, THIS, NEW, BANG, LPAREN)
-                            }
-                    }
-            }
-        }
+    def parseExpression: ExprTree = parseNext(parseOrExpr)
 
-        parseExpr(None)
+    def parseOr(lhs: ExprTree): ExprTree = {
+        currentToken.kind match {
+            case OR =>
+                eat(OR)
+                parseOr(new Or(lhs, parseAndExpr))
+            case _ => lhs
+        }
+    }
+
+    def parseOrExpr: ExprTree = parseNext(parseOr(parseAndExpr))
+
+    def parseAnd(lhs: ExprTree): ExprTree = {
+        currentToken.kind match {
+            case AND =>
+                eat(AND)
+                parseAnd(new And(lhs, parseLessThanEqualsExpr))
+            case _ => lhs
+        }
+    }
+
+    def parseAndExpr: ExprTree = parseNext(parseAnd(parseLessThanEqualsExpr))
+
+    def parseLessThanEquals(lhs: ExprTree): ExprTree = {
+        currentToken.kind match {
+            case LESSTHAN =>
+                eat(LESSTHAN)
+                parseLessThanEquals(new LessThan(lhs, parsePlusMinusExpr))
+            case EQUALS =>
+                eat(EQUALS)
+                parseLessThanEquals(new Equals(lhs, parsePlusMinusExpr))
+            case _ => lhs
+        }
+    }
+
+    def parseLessThanEqualsExpr: ExprTree = parseNext(parseLessThanEquals(parsePlusMinusExpr))
+
+    def parsePlusMinus(lhs: ExprTree): ExprTree = {
+        currentToken.kind match {
+            case PLUS =>
+                eat(PLUS)
+                parsePlusMinus(new Plus(lhs, parseTimesDivExpr))
+            case MINUS =>
+                eat(MINUS)
+                parsePlusMinus(new Minus(lhs, parseTimesDivExpr))
+            case _ => lhs
+        }
+    }
+
+    def parsePlusMinusExpr: ExprTree = parseNext(parsePlusMinus(parseTimesDivExpr))
+
+    def parseTimesDiv(lhs: ExprTree): ExprTree = {
+        currentToken.kind match {
+            case TIMES =>
+                eat(TIMES)
+                parseTimesDiv(new Times(lhs, parseNextExpr))
+            case DIV =>
+                eat(DIV)
+                parseTimesDiv(new Div(lhs, parseNextExpr))
+            case _ => lhs
+        }
+    }
+
+    def parseTimesDivExpr: ExprTree = parseNext(parseTimesDiv(parseSimpleExpr))
+
+    def parseNext(lhs: ExprTree): ExprTree = {
+        currentToken.kind match {
+            case DOT =>
+                eat(DOT)
+                currentToken.kind match {
+                    case LENGTH =>
+                        eat(LENGTH)
+                        parseNext(new ArrayLength(lhs))
+                    case _ =>
+                        currentToken match {
+                            case x: ID =>
+                                eat(IDKIND)
+                                eat(LPAREN)
+                                var args: List[ExprTree] = Nil
+                                if (currentToken.kind != RPAREN) {
+                                    args = parseExpression :: args
+                                    while (currentToken.kind == COMMA) {
+                                        eat(COMMA)
+                                        args = parseExpression :: args
+                                    }
+                                }
+                                eat(RPAREN)
+                                parseNext(new MethodCall(lhs, new Identifier(x.value), args.reverse))
+                            case _ => expected(IDKIND)
+                        }
+                }
+            case LBRACKET =>
+                eat(LBRACKET)
+                val index = parseExpression
+                eat(RBRACKET)
+                parseNext(new ArrayRead(lhs, index))
+            case _ => lhs
+        }
+    }
+
+    def parseNextExpr: ExprTree = parseNext(parseSimpleExpr)
+
+    def parseSimpleExpr: ExprTree = {
+        currentToken.kind match {
+            case THIS =>
+                eat(THIS)
+                new This()
+            case TRUE =>
+                eat(TRUE)
+                new True()
+            case FALSE =>
+                eat(FALSE)
+                new False()
+            case BANG =>
+                eat(BANG)
+                new Not(parseExpression)
+            case NEW =>
+                eat(NEW)
+                currentToken match {
+                    case x: ID =>
+                        val tpe = parseIdentifier
+                        eat(LPAREN)
+                        eat(RPAREN)
+                        new New(tpe)
+                    case _ =>
+                        currentToken.kind match {
+                            case INT =>
+                                eat(INT)
+                                eat(LBRACKET)
+                                val expr = parseExpression
+                                eat(RBRACKET)
+                                new NewIntArray(expr)
+                            case _ => expected(IDKIND, INT)
+                        }
+                }
+            case LPAREN =>
+                eat(LPAREN)
+                val expr = parseExpression
+                eat(RPAREN)
+                expr
+            case _ =>
+                currentToken match {
+                    case x: INTLIT =>
+                        eat(INTLITKIND)
+                        new IntLit(x.value)
+                    case x: STRLIT =>
+                        eat(STRLITKIND)
+                        new StringLit(x.value)
+                    case x: ID =>
+                        eat(IDKIND)
+                        new Identifier(x.value)
+                    case _ => expected(INTLITKIND, STRLITKIND, IDKIND)
+                }
+        }
     }
 
     def parseIdentifier: Identifier = {
