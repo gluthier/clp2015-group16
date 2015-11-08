@@ -275,15 +275,26 @@ object Parser extends Pipeline[Iterator[Token], Program] {
         currentToken.kind match {
             case TIMES =>
                 eat(TIMES)
-                parseTimesDiv(new Times(lhs, parseNextExpr))
+                parseTimesDiv(new Times(lhs, parseBangExpr))
             case DIV =>
                 eat(DIV)
-                parseTimesDiv(new Div(lhs, parseNextExpr))
+                parseTimesDiv(new Div(lhs, parseBangExpr))
             case _ => lhs
         }
     }
 
-    def parseTimesDivExpr: ExprTree = parseNext(parseTimesDiv(parseSimpleExpr))
+    def parseTimesDivExpr: ExprTree = parseNext(parseTimesDiv(parseBang))
+
+    def parseBang: ExprTree = {
+        currentToken.kind match {
+            case BANG =>
+                eat(BANG)
+                parseNext(new Not(parseNextExpr))
+            case _ => parseBangExpr
+        }
+    }
+
+    def parseBangExpr: ExprTree = parseNext(parseSimpleExpr)
 
     def parseNext(lhs: ExprTree): ExprTree = {
         currentToken.kind match {
@@ -333,9 +344,6 @@ object Parser extends Pipeline[Iterator[Token], Program] {
             case FALSE =>
                 eat(FALSE)
                 new False()
-            case BANG =>
-                eat(BANG)
-                new Not(parseExpression)
             case NEW =>
                 eat(NEW)
                 currentToken match {
