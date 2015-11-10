@@ -27,7 +27,8 @@ object Main {
 
     val pipeline = Lexer andThen
                    Parser andThen
-                   NameAnalysis
+                   NameAnalysis andThen
+                   TypeChecking
 
     val result = pipeline.run(ctx)(ctx.file)
 
