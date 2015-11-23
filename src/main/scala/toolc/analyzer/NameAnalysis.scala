@@ -108,8 +108,6 @@ object NameAnalysis extends Pipeline[Program, Program] {
       checkStatement(null, s)
     }
 
-    prog
-
 
     @tailrec
     def checkParents(checkClass: ClassSymbol, parentClass: ClassSymbol, classList: List[String]) {
@@ -279,6 +277,8 @@ object NameAnalysis extends Pipeline[Program, Program] {
         case _ =>
       }
     }
+
+  prog
 
   }
 }
