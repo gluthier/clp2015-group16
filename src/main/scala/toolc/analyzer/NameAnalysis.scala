@@ -5,6 +5,8 @@ import utils._
 import ast.Trees._
 import Symbols._
 
+import scala.annotation.tailrec
+
 object NameAnalysis extends Pipeline[Program, Program] {
 
   def run(ctx: Context)(prog: Program): Program = {
@@ -15,6 +17,268 @@ object NameAnalysis extends Pipeline[Program, Program] {
     // Step 2: Attach symbols to identifiers (except method calls) in method bodies
 
     // Make sure you check for all constraints
+    val gS = new GlobalScope()
+
+    gS.mainClass = new ClassSymbol(prog.main.id.value)
+
+    prog.main.setSymbol(gS.mainClass)
+
+    /*
+     * Checks if:
+     *  a class is defined more than once
+     *  a class uses the same name as the main object
+     */
+    for (c <- prog.classes) {
+      gS.lookupClass(c.id.value) match {
+        case Some(x) => error("Class " + c.id.value + " is defined more than once!", x)
+        case None =>
+          if (gS.mainClass.name equals c.id.value) {
+            error("Class " + c.id.value + " has same name as main object!", gS.mainClass)
+          } else {
+            val cs = new ClassSymbol(c.id.value)
+            c.setSymbol(cs)
+            c.id.setSymbol(cs)
+            gS.classes += c.id.value -> cs
+          }
+      }
+    }
+
+    /*
+     * Checks if:
+     *  a variable is defined more than once
+     *  the inheritance graph has a cycle
+     *  a class name is used as a symbol but is not declared
+     */
+    for (c <- prog.classes) {
+      val cs = c.getSymbol
+      c.parent match {
+        case Some(p) =>
+          cs.parent = gS.lookupClass(p.value) match {
+            case Some(e) =>
+              val emptySet: List[String] = List()
+              checkParents(cs, e, emptySet)
+              p.setSymbol(e)
+              Some(e)
+            case None =>
+              if (p.value equals gS.mainClass.name) {
+                error("Class " + c.id.value + "extends the main class!", cs)
+                None
+              } else {
+                error("Class " + c.id.value + " is used as a symbol but is not declared!", cs)
+                None
+              }
+          }
+        case None =>
+      }
+
+      for (v <- c.vars) {
+        cs.lookupVar(v.id.value) match {
+          case Some(x) => error("Variable " + v.id.value + " is defined more than once!", cs)
+          case None =>
+            val vs = new VariableSymbol(v.id.value)
+            v.setSymbol(vs)
+            v.id.setSymbol(vs)
+            cs.members += v.id.value -> vs
+        }
+      }
+
+      for (m <- c.methods) {
+        cs.lookupMethod(m.id.value) match {
+          case Some(x) =>
+            if (x.classSymbol != cs && m.args.size == x.argList.size) {
+              createMethods(m, cs, Some(x))
+            } else if (x.classSymbol == cs) {
+              error("Two methods have the same name")
+            }
+          case None =>
+            createMethods(m, cs, None)
+        }
+      }
+    }
+
+    for (c <- prog.classes) {
+      for (m <- c.methods) {
+        for (s <- m.stats) {
+          checkStatement(m.getSymbol, s)
+        }
+      }
+    }
+
+    for (s <- prog.main.stats) {
+      checkStatement(null, s)
+    }
+
     prog
+
+
+    @tailrec
+    def checkParents(checkClass: ClassSymbol, parentClass: ClassSymbol, classList: List[String]) {
+      if (classList contains parentClass.name) {
+        fatal("There is a cycle in the inheritance!", parentClass)
+      } else {
+        parentClass.parent match {
+          case Some(p) => checkParents(checkClass, p, classList :+ parentClass.name)
+          case None =>
+        }
+      }
+    }
+
+    def createMethods(m: MethodDecl, cs: ClassSymbol, om: Option[MethodSymbol]): Unit = {
+      val ms = new MethodSymbol(m.id.value, cs)
+      m.setSymbol(ms)
+      m.id.setSymbol(ms)
+
+      for (a <- m.args) {
+        ms.lookupVar(a.id.value) match {
+          case Some(x) =>
+            ms.classSymbol.lookupVar(x.name) match {
+              case Some(y) =>
+                val vs = new VariableSymbol(y.name)
+                ms.params += (a.id.value -> vs)
+                a.id.setSymbol(vs)
+                a.setSymbol(vs)
+              case None =>
+                error("Two methods arguments have the same name!", ms)
+            }
+          case None =>
+            val param = new VariableSymbol(a.id.value)
+            a.setSymbol(param)
+            a.id.setSymbol(param)
+            ms.params += a.id.value -> param
+            ms.argList = ms.argList :+ param
+        }
+      }
+
+      ms.overridden = cs.lookupMethod(m.id.value) match {
+        case Some(x) =>
+          if (cs.name.equals(x.classSymbol.name)) {
+            error("Method is overloaded!", ms)
+            Some(x)
+          } else {
+            cs.parent match {
+              case Some(p) =>
+                if (x.params.size != m.args.size) error("Method is overloaded!", ms)
+                Some(x)
+              case None => error("Method not overridden!", ms); None
+            }
+          }
+        case None => None
+      }
+
+      for (me <- m.vars) {
+        cs.lookupVar(me.id.value) match {
+          case Some(x) => error("Class member is overloaded!", me)
+          case None =>
+            val member = new VariableSymbol(me.id.value)
+            me.setSymbol(member)
+            me.id.setSymbol(member)
+            ms.members += me.id.value -> member
+        }
+      }
+
+      checkExpression(ms, m.retExpr)
+
+      cs.methods += m.id.value -> ms
+
+    }
+
+    def checkStatement(m: MethodSymbol, s: StatTree) {
+      s match {
+        case block: Block =>
+          for (statement <- block.stats) {
+            checkStatement(m, statement)
+          }
+        case print: Println =>
+          checkExpression(m, print.expr)
+        case Assign(id, expr) =>
+          checkExpression(m, id)
+          checkExpression(m, expr)
+        case ifStat: If =>
+          checkExpression(m, ifStat.expr)
+          checkStatement(m, ifStat.thn)
+          ifStat.els match {
+            case Some(e) => checkStatement(m, e)
+            case None =>
+          }
+        case whileStat: While =>
+          checkExpression(m, whileStat.expr)
+          checkStatement(m, whileStat.stat)
+        case array: ArrayAssign =>
+          checkExpression(m, array.id)
+          checkExpression(m, array.index)
+          checkExpression(m, array.expr)
+      }
+    }
+
+    def checkExpression(s: MethodSymbol, expr: ExprTree) {
+      expr match {
+        case identifier: Identifier =>
+          println("#####" + identifier)
+          s lookupVar identifier.value match {
+            case Some(v) =>
+              identifier.setSymbol(v)
+            case None =>
+              s.classSymbol lookupVar identifier.value match {
+                case Some(v) =>
+                  identifier.setSymbol(v)
+                case None => fatal("Compiler error")
+              }
+          }
+        case and: And =>
+          checkExpression(s, and.lhs)
+          checkExpression(s, and.rhs)
+        case or: Or =>
+          checkExpression(s, or.lhs)
+          checkExpression(s, or.rhs)
+        case plus: Plus =>
+          checkExpression(s, plus.lhs)
+          checkExpression(s, plus.rhs)
+        case minus: Minus =>
+          checkExpression(s, minus.lhs)
+          checkExpression(s, minus.rhs)
+        case times: Times =>
+          checkExpression(s, times.lhs)
+          checkExpression(s, times.rhs)
+        case div: Div =>
+          checkExpression(s, div.lhs)
+          checkExpression(s, div.rhs)
+        case lessThan: LessThan =>
+          checkExpression(s, lessThan.lhs)
+          checkExpression(s, lessThan.rhs)
+        case equals: Equals =>
+          checkExpression(s, equals.lhs)
+          checkExpression(s, equals.rhs)
+        case arrayRead: ArrayRead =>
+          checkExpression(s, arrayRead.arr)
+          checkExpression(s, arrayRead.index)
+        case arrayLength: ArrayLength =>
+          checkExpression(s, arrayLength.arr)
+        case mc: MethodCall =>
+          checkExpression(s, mc.obj)
+          for (a <- mc.args) {
+            checkExpression(s, a)
+          }
+        case t: True =>
+        case f: False =>
+        case i: IntLit =>
+        case s: StringLit =>
+        case t: This =>
+          s match {
+            case ms: MethodSymbol => t.setSymbol(ms.classSymbol)
+            case _ =>
+          }
+        case n: New =>
+          gS.lookupClass(n.tpe.value) match {
+            case Some(x) => n.tpe.setSymbol(x);
+            case None =>
+          }
+        case na: NewIntArray =>
+          checkExpression(s, na.size)
+        case n: Not =>
+          checkExpression(s, n.expr)
+        case _ =>
+      }
+    }
+
   }
 }
