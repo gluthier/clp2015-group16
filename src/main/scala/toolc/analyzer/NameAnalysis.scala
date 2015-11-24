@@ -167,18 +167,15 @@ object NameAnalysis extends Pipeline[Program, Program] {
       }
 
       for (me <- m.vars) {
-        cs.lookupVar(me.id.value) match {
-          case Some(x) => error("Class member is overloaded!", x)
+        ms.lookupVar(me.id.value) match {
+          case Some(x) => error("Member is overloaded!", x)
           case None =>
             val member = new VariableSymbol(me.id.value)
             me.setSymbol(member)
             me.id.setSymbol(member)
             ms.members += me.id.value -> member
         }
-        ms.lookupVar(me.id.value) match {
-          case Some(x) => error("Member is shadowed!", x)
-          case None =>
-        }
+        // if (ms.params contains me.id.value) error("Member is shadowed!", me)
       }
 
       checkExpression(ms, m.retExpr)
