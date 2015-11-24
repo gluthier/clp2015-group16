@@ -16,6 +16,8 @@ object Symbols {
       case Some(s) => s
       case None => sys.error("Accessing undefined symbol.")
     }
+
+    def hasSymbol: Boolean = _sym.isDefined
   }
 
   sealed abstract class Symbol extends Positioned {
@@ -45,16 +47,11 @@ object Symbols {
     var methods = Map[String,MethodSymbol]()
     var members = Map[String,VariableSymbol]()
 
-    def lookupMethod(n: String): Option[MethodSymbol] = {
-      if (methods contains n) Some(methods(n))
-      else {
-        parent match {
-          case Some(x) => x.lookupMethod(n)
-          case None => None
-        }
-      }
-    }
-    def lookupVar(n: String): Option[VariableSymbol] = members get n
+    def lookupMethod(n: String): Option[MethodSymbol] =
+      methods get n orElse (parent flatMap (_.lookupMethod(n)))
+
+    def lookupVar(n: String): Option[VariableSymbol] =
+      members get n orElse (parent flatMap (_.lookupVar(n)))
   }
 
   class MethodSymbol(val name: String, val classSymbol: ClassSymbol) extends Symbol {
@@ -63,12 +60,8 @@ object Symbols {
     var argList: List[VariableSymbol] = Nil
     var overridden : Option[MethodSymbol] = None
 
-    def lookupVar(n: String): Option[VariableSymbol] = {
-      members get n match {
-        case Some(x) => Some(x)
-        case None => params get n
-      }
-    }
+    def lookupVar(n: String): Option[VariableSymbol] =
+      members get n orElse (params get n) orElse (classSymbol lookupVar n)
   }
 
   class VariableSymbol(val name: String) extends Symbol

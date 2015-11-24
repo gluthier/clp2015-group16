@@ -22,6 +22,7 @@ object NameAnalysis extends Pipeline[Program, Program] {
     gS.mainClass = new ClassSymbol(prog.main.id.value)
 
     prog.main.setSymbol(gS.mainClass)
+    prog.main.id.setSymbol(gS.mainClass)
 
     /*
      * Checks if:
@@ -49,13 +50,13 @@ object NameAnalysis extends Pipeline[Program, Program] {
      *  the inheritance graph has a cycle
      *  a class name is used as a symbol but is not declared
      */
-    for (c <- prog.classes) {
+    for (c <- prog.classes if c.hasSymbol) {
       val cs = c.getSymbol
       c.parent match {
         case Some(p) =>
           cs.parent = gS.lookupClass(p.value) match {
             case Some(e) =>
-              val emptySet: List[String] = List()
+              val emptySet = Set.empty[String]
               checkParents(cs, e, emptySet)
               p.setSymbol(e)
               Some(e)
@@ -88,7 +89,9 @@ object NameAnalysis extends Pipeline[Program, Program] {
             if (x.classSymbol != cs && m.args.size == x.argList.size) {
               createMethods(m, cs, Some(x))
             } else if (x.classSymbol == cs) {
-              error("Two methods have the same name")
+              error("Two methods have the same name!", x)
+            } else {
+              error("Method " + m.id.value + " is overridden!", x)
             }
           case None =>
             createMethods(m, cs, None)
@@ -110,12 +113,12 @@ object NameAnalysis extends Pipeline[Program, Program] {
 
 
     @tailrec
-    def checkParents(checkClass: ClassSymbol, parentClass: ClassSymbol, classList: List[String]) {
+    def checkParents(checkClass: ClassSymbol, parentClass: ClassSymbol, classList: Set[String]) {
       if (classList contains parentClass.name) {
         fatal("There is a cycle in the inheritance!", parentClass)
       } else {
         parentClass.parent match {
-          case Some(p) => checkParents(checkClass, p, classList :+ parentClass.name)
+          case Some(p) => checkParents(checkClass, p, classList + checkClass.name)
           case None =>
         }
       }
@@ -155,9 +158,9 @@ object NameAnalysis extends Pipeline[Program, Program] {
           } else {
             cs.parent match {
               case Some(p) =>
-                if (x.params.size != m.args.size) error("Method is overloaded!", ms)
+                if (x.params.size != m.args.size) error("Method is overloaded!", x)
                 Some(x)
-              case None => error("Method not overridden!", ms); None
+              case None => error("Method not overridden!", x); None
             }
           }
         case None => None
@@ -165,12 +168,16 @@ object NameAnalysis extends Pipeline[Program, Program] {
 
       for (me <- m.vars) {
         cs.lookupVar(me.id.value) match {
-          case Some(x) => error("Class member is overloaded!", me)
+          case Some(x) => error("Class member is overloaded!", x)
           case None =>
             val member = new VariableSymbol(me.id.value)
             me.setSymbol(member)
             me.id.setSymbol(member)
             ms.members += me.id.value -> member
+        }
+        ms.lookupVar(me.id.value) match {
+          case Some(x) => error("Member is shadowed!", x)
+          case None =>
         }
       }
 
@@ -219,7 +226,7 @@ object NameAnalysis extends Pipeline[Program, Program] {
               s.classSymbol lookupVar identifier.value match {
                 case Some(v) =>
                   identifier.setSymbol(v)
-                case None => fatal("Compiler error")
+                case None =>
               }
           }
         case and: And =>
