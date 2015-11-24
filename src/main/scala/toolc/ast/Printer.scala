@@ -5,6 +5,8 @@ import Trees._
 import toolc.utils.{Context, Pipeline}
 
 object Printer extends Pipeline[Program, String] {
+    var counter : Int = 0
+
     def apply(t: Tree): String = {
         def applyWithIndent(t: Tree, indentLvl: String): String = {
             t match {
@@ -30,8 +32,8 @@ object Printer extends Pipeline[Program, String] {
                         builder_meths.append(applyWithIndent(m, indentLvl + "\t") + "\n")
                     }
                     parent match {
-                        case Some(parent) =>
-                        "class " + applyWithIndent(id, indentLvl) + " extends " + applyWithIndent(parent, indentLvl) + " {\n" + builder_vars.mkString + builder_meths.mkString + "}"
+                        case Some(par) =>
+                        "class " + applyWithIndent(id, indentLvl) + " extends " + applyWithIndent(par, indentLvl) + " {\n" + builder_vars.mkString + builder_meths.mkString + "}"
                         case None =>
                         "class " + applyWithIndent(id, indentLvl) + " {\n" + builder_vars.mkString + builder_meths.mkString + "}"
                     }
@@ -75,11 +77,11 @@ object Printer extends Pipeline[Program, String] {
                     builder_stats.mkString
                 case If(expr, thn, els) =>
                     els match {
-                        case Some(els) =>
+                        case Some(elsi) =>
                             indentLvl + "if (" + applyWithIndent(expr, indentLvl) + ") {\n" +
                             applyWithIndent(thn, indentLvl + "\t") + "\n" +
                             indentLvl + "} else {\n" +
-                            applyWithIndent(els, indentLvl + "\t") + "\n" + indentLvl + "}"
+                            applyWithIndent(elsi, indentLvl + "\t") + "\n" + indentLvl + "}"
                         case None =>
                             indentLvl + "if (" + applyWithIndent(expr, indentLvl) + ") {\n" +
                             applyWithIndent(thn, indentLvl + "\t") + "\n" + indentLvl + "}"
@@ -132,8 +134,9 @@ object Printer extends Pipeline[Program, String] {
                     "true"
                 case False() =>
                     "false"
-                case Identifier(value) =>
-                    value
+                case id : Identifier =>
+                    if (id.hasSymbol) id.value + "#" + id.getSymbol.id
+                    else id.value + "#??"
                 case This() =>
                     "this"
                 case NewIntArray(size) =>
