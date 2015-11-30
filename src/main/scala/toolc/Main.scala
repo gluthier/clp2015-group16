@@ -26,13 +26,9 @@ object Main {
     val ctx = processOptions(args)
 
     val pipeline = Lexer andThen
-      Parser andThen
-      /* Printer andThen
-      StringToFile andThen
-      Lexer andThen
-      Parser andThen
-      Printer andThen */
-      NameAnalysis
+                   Parser andThen
+                   NameAnalysis andThen
+                   TypeChecking
 
     val result = pipeline.run(ctx)(ctx.file)
 
