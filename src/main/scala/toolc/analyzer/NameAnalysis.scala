@@ -4,6 +4,7 @@ package analyzer
 import utils._
 import ast.Trees._
 import Symbols._
+import Types._
 
 import scala.annotation.tailrec
 
@@ -40,6 +41,7 @@ object NameAnalysis extends Pipeline[Program, Program] {
             c.setSymbol(cs)
             c.id.setSymbol(cs)
             gS.classes += c.id.value -> cs
+            cs.setType(TObject(cs))
           }
       }
     }
@@ -128,6 +130,8 @@ object NameAnalysis extends Pipeline[Program, Program] {
       val ms = new MethodSymbol(m.id.value, cs)
       m.setSymbol(ms)
       m.id.setSymbol(ms)
+      ms.setType(retrieveType(m.retType, gS))
+      m.retType.setType(retrieveType(m.retType, gS))
 
       for (a <- m.args) {
         ms.lookupVar(a.id.value) match {
@@ -138,6 +142,7 @@ object NameAnalysis extends Pipeline[Program, Program] {
                 ms.params += (a.id.value -> vs)
                 a.id.setSymbol(vs)
                 a.setSymbol(vs)
+                vs.setType(retrieveType(a.tpe, gS))
               case None =>
                 error("Two methods arguments have the same name!", ms)
             }
@@ -147,6 +152,7 @@ object NameAnalysis extends Pipeline[Program, Program] {
             a.id.setSymbol(param)
             ms.params += a.id.value -> param
             ms.argList = ms.argList :+ param
+            param.setType(retrieveType(a.tpe, gS))
         }
       }
 
@@ -173,6 +179,7 @@ object NameAnalysis extends Pipeline[Program, Program] {
             val member = new VariableSymbol(me.id.value)
             me.setSymbol(member)
             me.id.setSymbol(member)
+            member.setType(retrieveType(me.tpe, gS))
             ms.members += me.id.value -> member
         }
         // if (ms.params contains me.id.value) error("Member is shadowed!", me)
@@ -219,10 +226,12 @@ object NameAnalysis extends Pipeline[Program, Program] {
           s lookupVar identifier.value match {
             case Some(v) =>
               identifier.setSymbol(v)
+              identifier.setType(v.getType)
             case None =>
               s.classSymbol lookupVar identifier.value match {
                 case Some(v) =>
                   identifier.setSymbol(v)
+                  identifier.setType(v.getType)
                 case None =>
               }
           }
@@ -261,21 +270,30 @@ object NameAnalysis extends Pipeline[Program, Program] {
             checkExpression(s, a)
           }
         case t: True =>
+          t.setType(TBoolean)
         case f: False =>
+          f.setType(TBoolean)
         case i: IntLit =>
+          i.setType(TInt)
         case s: StringLit =>
+          s.setType(TString)
         case t: This =>
           s match {
-            case ms: MethodSymbol => t.setSymbol(ms.classSymbol)
+            case ms: MethodSymbol =>
+              t.setSymbol(ms.classSymbol)
+              t.setType(TObject(ms.classSymbol))
             case _ =>
           }
         case n: New =>
           gS.lookupClass(n.tpe.value) match {
-            case Some(x) => n.tpe.setSymbol(x);
+            case Some(x) => 
+              n.tpe.setSymbol(x);
+              n.setType(retrieveType(n.tpe, gS))
             case None =>
           }
         case na: NewIntArray =>
           checkExpression(s, na.size)
+          na.setType(TIntArray)
         case n: Not =>
           checkExpression(s, n.expr)
         case _ =>
@@ -284,5 +302,21 @@ object NameAnalysis extends Pipeline[Program, Program] {
 
   prog
 
+  }
+
+  def retrieveType(t: TypeTree, gS: GlobalScope): Type = {
+    t match {
+      case IntType() => TInt
+      case BooleanType() => TBoolean
+      case IntArrayType() => TIntArray
+      case StringType() => TString
+      case id: Identifier =>
+        gS.lookupClass(id.value) match {
+          case Some(x) =>
+            id.setSymbol(x)
+            TObject(x)
+          case None => error("error")
+        }
+    }
   }
 }
