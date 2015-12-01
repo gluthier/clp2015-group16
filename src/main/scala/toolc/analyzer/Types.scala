@@ -68,7 +68,7 @@ object Types {
             cs.parent match {
               case Some(x) =>
                 if (x.getType == tpe) true
-                else isSubTypeOf(x.getType)
+                else tpe.isSubTypeOf(x.getType)
               case None => false
             }
         }
