@@ -132,19 +132,33 @@ object TypeChecking extends Pipeline[Program, Program] {
         case Println(expr) =>
           tcExpr(expr, TInt, TBoolean, TString)
         case Assign(id, expr) =>
-          // TODO
+          tcExpr(expr, id.getType)
         case ArrayAssign(id, index, expr) =>
-          // TODO
           tcExpr(index, TInt)
           tcExpr(expr, TInt)
       }
     }
    
-    // TODO
-
     // Traverse and typecheck the program
     // ...
-    
+ 
+    for (s <- prog.main.stats) {
+      tcStat(s)
+    }
+
+    for (c <- prog.classes) {
+      for (m <- c.methods) {
+        val mRet = m.retExpr
+        val mRetType = m.retType.getType
+
+        tcExpr(mRet, mRetType)
+
+        for (s <- m.stats) {
+          tcStat(s)
+        }
+      }
+    }
+
     prog
   }
 }
