@@ -7,18 +7,34 @@ import lexer._
 import ast._
 import eval._
 import analyzer._
+import code._
 
 object Main {
 
   def processOptions(args: Array[String]): Context = {
-    val (opts, files) = args.toSeq.partition(_.startsWith("--"))
     val reporter = new Reporter()
+    var files: List[File] = Nil
+    var outDir: Option[File] = None
+
+    def rec(args: List[String]): Unit = args match {
+      case "-d" :: dir :: xs =>
+        outDir = Some(new File(dir))
+        rec(xs)
+
+      case f :: xs =>
+        files  ::= new File(f)
+        rec(xs)
+
+      case _ =>
+    }
+
+    rec(args.toList)
 
     if (files.size != 1) {
       reporter.fatal("Exactly one file expected, "+files.size+" file(s) given.")
     }
 
-    Context(reporter = reporter, file = new File(files.head))
+    Context(reporter = reporter, file = files.head, outDir = outDir)
   }
 
 
@@ -28,12 +44,11 @@ object Main {
     val pipeline = Lexer andThen
                    Parser andThen
                    NameAnalysis andThen
-                   TypeChecking
+                   TypeChecking andThen
+                   CodeGeneration
 
-    val result = pipeline.run(ctx)(ctx.file)
+    pipeline.run(ctx)(ctx.file)
 
     ctx.reporter.terminateIfErrors
-
-    println(Printer(result))
   }
 }
