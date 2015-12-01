@@ -24,6 +24,7 @@ object NameAnalysis extends Pipeline[Program, Program] {
 
     prog.main.setSymbol(gS.mainClass)
     prog.main.id.setSymbol(gS.mainClass)
+    gS.mainClass.setType(TObject(gS.mainClass))
 
     /*
      * Checks if:
@@ -81,6 +82,8 @@ object NameAnalysis extends Pipeline[Program, Program] {
             val vs = new VariableSymbol(v.id.value)
             v.setSymbol(vs)
             v.id.setSymbol(vs)
+            vs.setType(retrieveType(v.tpe, gS))
+            v.tpe.setType(retrieveType(v.tpe, gS))
             cs.members += v.id.value -> vs
         }
       }
@@ -143,6 +146,7 @@ object NameAnalysis extends Pipeline[Program, Program] {
                 a.id.setSymbol(vs)
                 a.setSymbol(vs)
                 vs.setType(retrieveType(a.tpe, gS))
+                a.tpe.setType(retrieveType(a.tpe, gS))
               case None =>
                 error("Two methods arguments have the same name!", ms)
             }
@@ -153,6 +157,7 @@ object NameAnalysis extends Pipeline[Program, Program] {
             ms.params += a.id.value -> param
             ms.argList = ms.argList :+ param
             param.setType(retrieveType(a.tpe, gS))
+            a.tpe.setType(retrieveType(a.tpe, gS))
         }
       }
 
@@ -180,6 +185,7 @@ object NameAnalysis extends Pipeline[Program, Program] {
             me.setSymbol(member)
             me.id.setSymbol(member)
             member.setType(retrieveType(me.tpe, gS))
+            me.tpe.setType(retrieveType(me.tpe, gS))
             ms.members += me.id.value -> member
         }
         // if (ms.params contains me.id.value) error("Member is shadowed!", me)
@@ -315,7 +321,7 @@ object NameAnalysis extends Pipeline[Program, Program] {
           case Some(x) =>
             id.setSymbol(x)
             TObject(x)
-          case None => error("error")
+          case None => error("Identifier not declared")
         }
     }
   }
