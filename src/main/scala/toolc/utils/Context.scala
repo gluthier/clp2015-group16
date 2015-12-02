@@ -5,5 +5,6 @@ import java.io.File
 
 case class Context(
   val reporter: Reporter,
-  val file: File
+  val file: File,
+  val outDir: Option[File] = None
 )
