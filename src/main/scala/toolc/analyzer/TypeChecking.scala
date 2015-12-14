@@ -18,12 +18,16 @@ object TypeChecking extends Pipeline[Program, Program] {
         case And(lhs, rhs) =>
           (tcExpr(lhs, TBoolean), tcExpr(rhs, TBoolean)) match {
             case (TBoolean, TBoolean) => TBoolean
-            case (l, r) => TError
+            case (l, r) => 
+              error("Type error: Expected: " + expected.toList.mkString(" or ") + ", found: " + lhs.getType + ", " + rhs.getType)
+              TError
           }
         case Or(lhs, rhs) =>
           (tcExpr(lhs, TBoolean), tcExpr(rhs, TBoolean)) match {
             case (TBoolean, TBoolean) => TBoolean
-            case (l, r) => TError
+            case (l, r) => 
+              error("Type error: Expected: " + expected.toList.mkString(" or ") + ", found: " + lhs.getType + ", " + rhs.getType)
+              TError
           }
         case Plus(lhs, rhs) =>
           (tcExpr(lhs, TInt, TString), tcExpr(rhs, TInt, TString)) match {
@@ -31,27 +35,37 @@ object TypeChecking extends Pipeline[Program, Program] {
             case (TInt, TString) => TString
             case (TString, TInt) => TString
             case (TString, TString) => TString
-            case (l, r) => TError
+            case (l, r) => 
+              error("Type error: Expected: " + expected.toList.mkString(" or ") + ", found: " + lhs.getType + ", " + rhs.getType)
+              TError
           }
         case Minus(lhs, rhs) =>
           (tcExpr(lhs, TInt), tcExpr(rhs, TInt)) match {
             case (TInt, TInt) => TInt
-            case _ => TError
+            case _ => 
+              error("Type error: Expected: " + expected.toList.mkString(" or ") + ", found: " + lhs.getType + ", " + rhs.getType)
+              TError
           }
         case Times(lhs, rhs) =>
           (tcExpr(lhs, TInt), tcExpr(rhs, TInt)) match {
             case (TInt, TInt) => TInt
-            case _ => TError
+            case _ => 
+              error("Type error: Expected: " + expected.toList.mkString(" or ") + ", found: " + lhs.getType + ", " + rhs.getType)
+              TError
           }
         case Div(lhs, rhs) =>
           (tcExpr(lhs, TInt), tcExpr(rhs, TInt)) match {
             case (TInt, TInt) => TInt
-            case _ => TError
+            case _ => 
+              error("Type error: Expected: " + expected.toList.mkString(" or ") + ", found: " + lhs.getType + ", " + rhs.getType)
+              TError
           }
         case LessThan(lhs, rhs) =>
           (tcExpr(lhs, TInt), tcExpr(rhs, TInt)) match {
             case (TInt, TInt) => TBoolean
-            case _ => TError
+            case _ =>
+              error("Type error: Expected: " + expected.toList.mkString(" or ") + ", found: " + lhs.getType + ", " + rhs.getType)
+              TError
           }
         case Equals(lhs, rhs) =>
           (tcExpr(lhs, TInt, TBoolean, TIntArray, TString), tcExpr(rhs, TInt, TBoolean, TIntArray, TString)) match {
@@ -60,7 +74,9 @@ object TypeChecking extends Pipeline[Program, Program] {
             case (TIntArray, TIntArray) => TBoolean
             case (TString, TString) => TBoolean
             case (TObject(cs1), TObject(cs2)) => TBoolean
-            case _ => TError
+            case _ => 
+              error("Type error: Expected: " + expected.toList.mkString(" or ") + ", found: " + lhs.getType + ", " + rhs.getType)
+              TError
           }
         case ArrayRead(arr, index) =>
           tcExpr(arr, TIntArray)
@@ -102,6 +118,9 @@ object TypeChecking extends Pipeline[Program, Program] {
           tcExpr(expr, TBoolean)
       }
 
+      // Set the type on the expression tree
+      expr.setType(tpe)
+
       // Check result and return a valid type in case of error
       if(expected.isEmpty) {
         tpe
@@ -134,6 +153,7 @@ object TypeChecking extends Pipeline[Program, Program] {
         case Assign(id, expr) =>
           tcExpr(expr, id.getType)
         case ArrayAssign(id, index, expr) =>
+          tcExpr(id, TIntArray)
           tcExpr(index, TInt)
           tcExpr(expr, TInt)
       }
@@ -150,6 +170,16 @@ object TypeChecking extends Pipeline[Program, Program] {
       for (m <- c.methods) {
         val mRet = m.retExpr
         val mRetType = m.retType.getType
+
+        val mSymbol = m.getSymbol
+        mSymbol.overridden match {
+          case Some(x) =>
+            if (mRetType != x.getType)
+              error("Overridden method's return type does not match: Expected: " + x.getType + ", found: " + mRetType)
+            if (m.args.size != x.argList.size)
+              error("Overridden method's number of arguments does not match: Expected: " + x.argList.size + ", found: " + m.args.size)
+          case None =>
+        }
 
         tcExpr(mRet, mRetType)
 

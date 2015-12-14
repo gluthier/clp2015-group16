@@ -16,8 +16,14 @@ object CodeGeneration extends Pipeline[Program, Unit] {
 
     /** Writes the proper .class file in a given directory. An empty string for dir is equivalent to "./". */
     def generateClassFile(sourceName: String, ct: ClassDecl, dir: String): Unit = {
-      // TODO: Create code handler, save to files ...
-      ???
+      val classFile = new cafebabe.ClassFile(ct.id.value + ".toolc", None)
+      
+      classFile.addDefaultConstructor
+
+      //val codeHandler = classFile.addMaintMethod.codeHandler
+
+
+      classFile.writeToFile(dir)
     }
 
     // a mapping from variable symbols to positions in the local variables
@@ -25,7 +31,13 @@ object CodeGeneration extends Pipeline[Program, Unit] {
     def generateMethodCode(ch: CodeHandler, mt: MethodDecl): Unit = {
       val methSym = mt.getSymbol
 
-      // TODO: Emit code
+     /* 
+
+      for (v <- mt.vars) {
+        ch << getInstructionForVar(v)
+      }
+
+      */
 
       ch.freeze
     }
@@ -50,7 +62,7 @@ object CodeGeneration extends Pipeline[Program, Unit] {
       ct => generateClassFile(sourceName, ct, outDir)
     }
 
-    // Now do the main method
+    // TODO: Now do the main method
     // ...
   }
 
