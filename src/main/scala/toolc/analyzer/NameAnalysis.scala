@@ -100,8 +100,8 @@ object NameAnalysis extends Pipeline[Program, Program] {
 
     for (c <- prog.classes if c.hasSymbol; m <- c.methods; p <- c.getSymbol.parent) {
       p.lookupMethod(m.id.value) foreach { x =>
-        /*if (x.argList.size != m.getSymbol.argList.size) error("Method invalidly overridden", x)
-        else*/ m.getSymbol.overridden = Some(x)
+        if (x.argList.size != m.getSymbol.argList.size) error("Method invalidly overridden", x)
+        else m.getSymbol.overridden = Some(x)
       }
 
 
