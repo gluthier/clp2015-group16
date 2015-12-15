@@ -68,12 +68,12 @@ object TypeChecking extends Pipeline[Program, Program] {
               TError
           }
         case Equals(lhs, rhs) =>
-          (tcExpr(lhs, TInt, TBoolean, TIntArray, TString), tcExpr(rhs, TInt, TBoolean, TIntArray, TString)) match {
+          (tcExpr(lhs, TInt, TBoolean, TIntArray, TString, TAnyObject), tcExpr(rhs, TInt, TBoolean, TIntArray, TString, TAnyObject)) match {
             case (TInt, TInt) => TBoolean
             case (TBoolean, TBoolean) => TBoolean
             case (TIntArray, TIntArray) => TBoolean
             case (TString, TString) => TBoolean
-            case (TObject(cs1), TObject(cs2)) => TBoolean
+            case (TObject(_), TObject(_)) => TBoolean
             case _ => 
               error("Type error: Expected: " + expected.toList.mkString(" or ") + ", found: " + lhs.getType + ", " + rhs.getType)
               TError
