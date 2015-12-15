@@ -16,12 +16,13 @@ object CodeGeneration extends Pipeline[Program, Unit] {
 
     /** Writes the proper .class file in a given directory. An empty string for dir is equivalent to "./". */
     def generateClassFile(sourceName: String, ct: ClassDecl, dir: String): Unit = {
-      val cf = new ClassFile(dir + sourceName + ".class", None)
+      val cf = new ClassFile(ct.id.value, None)
+      cf.setSourceFile(ct.id.value + ".toolc")
       cf.addDefaultConstructor
 
       val ch = cf.addMaintMethod.codeHandler
 
-      
+      // TODO 
 
       ch.freeze
 
@@ -38,14 +39,8 @@ object CodeGeneration extends Pipeline[Program, Unit] {
     def generateMethodCode(ch: CodeHandler, mt: MethodDecl): Unit = {
       val methSym = mt.getSymbol
 
-     /* 
-
-      for (v <- mt.vars) {
-        ch << getInstructionForVar(v)
-      }
-
-      */
-
+      // TODO
+      
       ch.freeze
     }
 
@@ -58,6 +53,13 @@ object CodeGeneration extends Pipeline[Program, Unit] {
       ch.freeze
     }
 
+    def getTypeCode(t: Type): String = t match {
+      case TInt => "I"
+      case TBoolean => "Z"
+      case TArray => "A"
+      case TString => "Ljava/lang/String;"
+    }
+
     def generateStatCode(ch: CodeHandler, stat: StatTree) {
       stat match {
         case Block(stats) =>
@@ -65,10 +67,34 @@ object CodeGeneration extends Pipeline[Program, Unit] {
             generateStatCode(ch, s)
           }
         case If(expr, thn, els) =>
+          val elseLabel = ch.getFreshLabel("else")
+          val endLabel = ch.getFreshLabel("end")
+          generateExprCode(ch, expr)
+          ch << Ldc(0) << If_ICmpEq(elseLabel)
+          generateStatCode(ch, thn)
+          ch << Goto(endLabel) << Label(elseLabel)
+          els match {
+            case Some(x) => generateStatCode(ch, x)
+            case None =>
+          }
+          ch << Label(endLabel)
         case While(expr, stat) =>
+          val loopLabel = ch.getFreshLabel("loop")
+          val endLabel = ch.getFreshLabel("end")
+          ch << Label(loopLabel)
+          generateExprCode(ch, expr)
+          ch << Ldc(0) << If_ICmpEq(endLabel)
+          generateStatCode(ch, stat)
+          ch << Goto(loopLabel) << Label(endLabel)
         case Println(expr) =>
+          ch << GetStatic("java/lang/System", "out", "Ljava/io/PrintStream;")
+          generateExprCode(expr)
+          ch << InvokeVirtual("java/io/PrintStream", "println", "(" + getTypeCode(expr.getType) + ")V")
         case Assign(id, expr) =>
+          // TODO
         case ArrayAssign(id, index, expr) =>
+          // TODO
+        case _ => error("Not a statement...")
       }
     }
 
@@ -95,8 +121,12 @@ object CodeGeneration extends Pipeline[Program, Unit] {
               generateExprCode(ch, rhs)
               ch << IADD
             case (TInt, TString) =>
+              // TODO
             case (TString, TInt) =>
+              // TODO
             case (TString, TString) =>
+              // TODO
+            case _ => error("Unable to generate code for expression: wrong types")
           }
         case Minus(lhs, rhs) =>
           generateExprCode(ch, lhs)
@@ -130,6 +160,7 @@ object CodeGeneration extends Pipeline[Program, Unit] {
           generateExprCode(ch, arr)
           ch << ARRAYLENGTH
         case MethodCall(obj, meth, args) =>
+          // TODO
         case IntLit(value) =>
           ch << Ldc(value)
         case StringLit(value) =>
@@ -139,15 +170,17 @@ object CodeGeneration extends Pipeline[Program, Unit] {
         case False() => 
           ch << Ldc(0)
         case Identifier(value) =>
+          // TODO
         case This() =>
           ch << ALOAD_0
         case NewIntArray(size) =>
+          // TODO
         case New(tpe) =>
           ch << DefaultNew(tpe.value)
         case Not(expr) =>
           generateExprCode(ch, expr)
           ch << Ldc(1) << IXOR
-        case _ => error("not an expression...")
+        case _ => error("Not an expression...")
       }
     }
 
