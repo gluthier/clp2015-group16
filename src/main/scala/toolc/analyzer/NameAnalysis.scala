@@ -123,7 +123,7 @@ object NameAnalysis extends Pipeline[Program, Program] {
 
     @tailrec
     def checkParents(checkClass: ClassSymbol, parentClass: ClassSymbol, classList: Set[String]) {
-      if (classList contains parentClass.name) {
+      if (classList contains parentClass.name || checkClass == parentClass) {
         fatal("There is a cycle in the inheritance!", parentClass)
       } else {
         parentClass.parent match {

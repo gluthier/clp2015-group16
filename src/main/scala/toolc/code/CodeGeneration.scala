@@ -71,7 +71,7 @@ object CodeGeneration extends Pipeline[Program, Unit] {
         case TBoolean => ch << IRETURN
         case TIntArray => ch << ARETURN
         case TString => ch << ARETURN
-        case _ => ch << IRETURN
+        case _ =>
       }
       
       ch.freeze
@@ -89,9 +89,10 @@ object CodeGeneration extends Pipeline[Program, Unit] {
     def getTypeCode(t: Type): String = t match {
       case TInt => "I"
       case TBoolean => "Z"
-      case TIntArray => "A"
+      case TIntArray => "[I"
       case TString => "Ljava/lang/String;"
-      case _ => "I"
+      case TObject(cs) => "L"+cs.name+";"
+      case _ => ""
     }
 
     def generateStatCode(ch: CodeHandler, stat: StatTree) {
