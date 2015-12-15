@@ -3,7 +3,6 @@ package analyzer
 
 import ast.Trees._
 
-import Symbols._
 import Types._
 import utils._
 
@@ -112,10 +111,10 @@ object TypeChecking extends Pipeline[Program, Program] {
         case NewIntArray(size) =>
           tcExpr(size, TInt)
           TIntArray
-        case New(tpe) =>
-          tpe.getType
-        case Not(expr) =>
-          tcExpr(expr, TBoolean)
+        case New(tpee) =>
+          tpee.getType
+        case Not(expre) =>
+          tcExpr(expre, TBoolean)
       }
 
       // Set the type on the expression tree
@@ -145,9 +144,9 @@ object TypeChecking extends Pipeline[Program, Program] {
             case Some(e) => tcStat(e)
             case None =>
           }
-        case While(expr, stat) =>
+        case While(expr, stats) =>
           tcExpr(expr, TBoolean)
-          tcStat(stat)
+          tcStat(stats)
         case Println(expr) =>
           tcExpr(expr, TInt, TBoolean, TString)
         case Assign(id, expr) =>

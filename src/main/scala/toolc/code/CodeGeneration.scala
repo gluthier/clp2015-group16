@@ -2,17 +2,16 @@ package toolc
 package code
 
 import ast.Trees._
-import analyzer.Symbols._
 import analyzer.Types._
 import cafebabe._
 import AbstractByteCodes.{New => _, _}
 import ByteCodes._
 import utils._
-import scala.collection.mutable.StringBuilder
 
 object CodeGeneration extends Pipeline[Program, Unit] {
 
   var ids: Map[Identifier, Int] = Map()
+  var currentClass: String = "";
 
   def run(ctx: Context)(prog: Program): Unit = {
     import ctx.reporter._
@@ -24,11 +23,11 @@ object CodeGeneration extends Pipeline[Program, Unit] {
       cf.addDefaultConstructor
 
       for (v <- ct.vars) {
-        val fh: FieldHandler = cf.addField(getTypeCode(v.tpe.getType), v.id.value)
+        cf.addField(getTypeCode(v.tpe.getType), v.id.value)
       }
 
       for (m <- ct.methods) {
-        var builder: StringBuilder = new StringBuilder()
+        val builder: StringBuilder = new StringBuilder()
 
         for (v <- m.vars) {
           builder.append(getTypeCode(v.tpe.getType))
@@ -36,11 +35,12 @@ object CodeGeneration extends Pipeline[Program, Unit] {
 
         val mh: MethodHandler = cf.addMethod(getTypeCode(m.retType.getType), m.id.value, builder.toString())
 
+        currentClass = ct.id.value
         generateMethodCode(mh.codeHandler, m)
       }
 
       try {
-        cf.writeToFile(dir+"/"+ct.id.value+".class")
+        cf.writeToFile(dir + "/" + ct.id.value + ".class")
       } catch {
         case io: java.io.IOException =>
           error("Failed to write file!")
@@ -50,8 +50,6 @@ object CodeGeneration extends Pipeline[Program, Unit] {
     // a mapping from variable symbols to positions in the local variables
     // of the stack frame
     def generateMethodCode(ch: CodeHandler, mt: MethodDecl): Unit = {
-      val methSym = mt.getSymbol
-
       for (a <- mt.args) {
         ids = ids + (a.id -> ch.getFreshVar)
       }
@@ -73,7 +71,7 @@ object CodeGeneration extends Pipeline[Program, Unit] {
         case TString => ch << ARETURN
         case _ =>
       }
-      
+
       ch.freeze
     }
 
@@ -91,7 +89,7 @@ object CodeGeneration extends Pipeline[Program, Unit] {
       case TBoolean => "Z"
       case TIntArray => "[I"
       case TString => "Ljava/lang/String;"
-      case TObject(cs) => "L"+cs.name+";"
+      case TObject(cs) => "L" + cs.name + ";"
       case _ => ""
     }
 
@@ -126,19 +124,31 @@ object CodeGeneration extends Pipeline[Program, Unit] {
           generateExprCode(ch, expr)
           ch << InvokeVirtual("java/io/PrintStream", "println", "(" + getTypeCode(expr.getType) + ")V")
         case Assign(id, expr) =>
-          ids.get(id) match {
-            case Some(x) =>
-              generateExprCode(ch, expr)
-              ch << IStore(x)
-            case None => error("Assigning to an id not in the map.")
+          if (ids contains id) {
+            generateExprCode(ch, expr)
+            id.getType match {
+              case TInt => IStore(ids(id))
+              case TIntArray => AStore(ids(id))
+              case TBoolean => IStore(ids(id))
+              case TString => AStore(ids(id))
+              case _ => AStore(ids(id)) // Object
+            }
+          } else {
+            ch << ALOAD_0
+            generateExprCode(ch, expr)
+            PutField(currentClass, id.value, getTypeCode(id.getType))
           }
         case ArrayAssign(id, index, expr) =>
-          ids.get(id) match {
-            case Some(x) =>
-              generateExprCode(ch,expr)
-              generateExprCode(ch,index)
-              ch << AStore(x)
-            case None => error("Assigning to an array not in the map")
+          if (ids contains id) {
+            ch << ALoad(ids(id))
+            generateExprCode(ch, expr)
+            generateExprCode(ch, index)
+            ch << IASTORE
+          } else {
+            ch << ALOAD_0
+            generateExprCode(ch, expr)
+            generateExprCode(ch, index)
+            ch << IASTORE
           }
         case _ => error("Not a statement...")
       }
@@ -168,23 +178,23 @@ object CodeGeneration extends Pipeline[Program, Unit] {
               ch << IADD
             case (TInt, TString) =>
               ch << DefaultNew("java/lang/StringBuilder")
-              generateExprCode(ch,lhs)
+              generateExprCode(ch, lhs)
               ch << InvokeVirtual("java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;")
-              generateExprCode(ch,rhs)
+              generateExprCode(ch, rhs)
               ch << InvokeVirtual("java/lang/StringBuilder", "append", "(I)Ljava/lang/StringBuilder;")
               ch << InvokeVirtual("java/lang/StringBuilder", "toString", "()Ljava/lang/String;")
             case (TString, TInt) =>
               ch << DefaultNew("java/lang/StringBuilder")
-              generateExprCode(ch,lhs)
+              generateExprCode(ch, lhs)
               ch << InvokeVirtual("java/lang/StringBuilder", "append", "(I)Ljava/lang/StringBuilder;")
-              generateExprCode(ch,rhs)
+              generateExprCode(ch, rhs)
               ch << InvokeVirtual("java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;")
               ch << InvokeVirtual("java/lang/StringBuilder", "toString", "()Ljava/lang/String;")
             case (TString, TString) =>
               ch << DefaultNew("java/lang/StringBuilder")
-              generateExprCode(ch,lhs)
+              generateExprCode(ch, lhs)
               ch << InvokeVirtual("java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;")
-              generateExprCode(ch,rhs)
+              generateExprCode(ch, rhs)
               ch << InvokeVirtual("java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;")
               ch << InvokeVirtual("java/lang/StringBuilder", "toString", "()Ljava/lang/String;")
             case _ => error("Unable to generate code for expression: wrong types")
@@ -226,16 +236,16 @@ object CodeGeneration extends Pipeline[Program, Unit] {
           builder.append("(")
           for (a <- args) {
             builder.append(getTypeCode(a.getType))
-            generateExprCode(ch,a)
+            generateExprCode(ch, a)
           }
           builder.append(")")
-          for(c <- prog.classes){
-            for(m <- c.methods) {
-              if(m.id == meth)
+          for (c <- prog.classes) {
+            for (m <- c.methods) {
+              if (m.id == meth)
                 builder.append(getTypeCode(m.retType.getType))
             }
           }
-          ch << InvokeVirtual(obj.getType.toString(), meth.value , builder.toString)
+          ch << InvokeVirtual(obj.getType.toString, meth.value, builder.toString)
         case IntLit(value) =>
           ch << Ldc(value)
         case StringLit(value) =>
@@ -278,13 +288,13 @@ object CodeGeneration extends Pipeline[Program, Unit] {
     }
 
     val cf = new ClassFile(prog.main.id.value, None)
-    cf.setSourceFile(prog.main.id.value+".toolc")
+    cf.setSourceFile(prog.main.id.value + ".toolc")
     cf.addDefaultConstructor
     val ch = cf.addMainMethod.codeHandler
     generateMainMethodCode(ch, prog.main.stats, prog.main.id.value)
-   
+
     try {
-      cf.writeToFile(outDir+"/"+prog.main.id.value+".class")
+      cf.writeToFile(outDir + "/" + prog.main.id.value + ".class")
     } catch {
       case io: java.io.IOException =>
         error("Failed to write file!")
