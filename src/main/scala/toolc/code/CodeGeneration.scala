@@ -37,10 +37,7 @@ object CodeGeneration extends Pipeline[Program, Unit] {
         val mh: MethodHandler = cf.addMethod(getTypeCode(m.retType.getType), m.id.value, builder.toString())
 
         generateMethodCode(mh.codeHandler, m)
-        mh.codeHandler.freeze
       }
-
-      ch.freeze
 
       try {
         cf.writeToFile(dir+"/"+ct.id.value+".class")
@@ -141,6 +138,7 @@ object CodeGeneration extends Pipeline[Program, Unit] {
               generateExprCode(ch,index)
               ch << AStore(x)
             case None => error("Assigning to an array not in the map")
+          }
         case _ => error("Not a statement...")
       }
     }
@@ -278,8 +276,17 @@ object CodeGeneration extends Pipeline[Program, Unit] {
       ct => generateClassFile(sourceName, ct, outDir)
     }
 
-    // TODO: Now do the main method
-    // ...
+    val cf = new ClassFile(prog.main.id.value, None)
+    cf.setSourceFile(prog.main.id.value+".toolc")
+    cf.addDefaultConstructor
+    val ch = cf.addMainMethod.codeHandler
+    generateMainMethodCode(ch, prog.main.stats, prog.main.id.value)
+   
+    try {
+      cf.writeToFile(outDir+"/"+prog.main.id.value+".class")
+    } catch {
+      case io: java.io.IOException =>
+        error("Failed to write file!")
+    }
   }
-
 }
