@@ -24,7 +24,7 @@ object CodeGeneration extends Pipeline[Program, Unit] {
 
       val ch = cf.addMainMethod.codeHandler
 
-      // TODO 
+      // TODO
 
       ch.freeze
 
@@ -133,11 +133,26 @@ object CodeGeneration extends Pipeline[Program, Unit] {
               generateExprCode(ch, rhs)
               ch << IADD
             case (TInt, TString) =>
-            // TODO
+              ch << DefaultNew("java/lang/StringBuilder")
+              generateExprCode(ch,lhs)
+              ch << InvokeVirtual("java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;")
+              generateExprCode(ch,rhs)
+              ch << InvokeVirtual("java/lang/StringBuilder", "append", "(I)Ljava/lang/StringBuilder;")
+              ch << InvokeVirtual("java/lang/StringBuilder", "toString", "()Ljava/lang/String;")
             case (TString, TInt) =>
-            // TODO
+              ch << DefaultNew("java/lang/StringBuilder")
+              generateExprCode(ch,lhs)
+              ch << InvokeVirtual("java/lang/StringBuilder", "append", "(I)Ljava/lang/StringBuilder;")
+              generateExprCode(ch,rhs)
+              ch << InvokeVirtual("java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;")
+              ch << InvokeVirtual("java/lang/StringBuilder", "toString", "()Ljava/lang/String;")
             case (TString, TString) =>
-            // TODO
+              ch << DefaultNew("java/lang/StringBuilder")
+              generateExprCode(ch,lhs)
+              ch << InvokeVirtual("java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;")
+              generateExprCode(ch,rhs)
+              ch << InvokeVirtual("java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;")
+              ch << InvokeVirtual("java/lang/StringBuilder", "toString", "()Ljava/lang/String;")
             case _ => error("Unable to generate code for expression: wrong types")
           }
         case Minus(lhs, rhs) =>
@@ -172,7 +187,21 @@ object CodeGeneration extends Pipeline[Program, Unit] {
           generateExprCode(ch, arr)
           ch << ARRAYLENGTH
         case MethodCall(obj, meth, args) =>
-        // TODO
+          generateExprCode(ch, obj)
+          val builder = new StringBuilder()
+          builder.append("(")
+          for (a <- args) {
+            builder.append(getTypeCode(a.getType))
+            generateExprCode(ch,a)
+          }
+          builder.append(")")
+          for(c <- prog.classes){
+            for(m <- c.methods) {
+              if(m.id == meth)
+                builder.append(getTypeCode(m.retType.getType))
+            }
+          }
+          ch << InvokeVirtual(obj.getType.toString(), meth.value , builder.toString)
         case IntLit(value) =>
           ch << Ldc(value)
         case StringLit(value) =>
@@ -181,12 +210,16 @@ object CodeGeneration extends Pipeline[Program, Unit] {
           ch << Ldc(1)
         case False() =>
           ch << Ldc(0)
-        case Identifier(value) =>
-        // TODO
+        case id: Identifier =>
+          ids get id match {
+            case Some(x) => ch << ILoad(x)
+            case None =>
+          }
         case This() =>
           ch << ALOAD_0
         case NewIntArray(size) =>
-        // TODO
+          generateExprCode(ch, size)
+          ch << NewArray(10)
         case New(tpe) =>
           ch << DefaultNew(tpe.value)
         case Not(expr) =>
