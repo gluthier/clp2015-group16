@@ -20,14 +20,14 @@ object CodeGeneration extends Pipeline[Program, Unit] {
       cf.setSourceFile(ct.id.value + ".toolc")
       cf.addDefaultConstructor
 
-      val ch = cf.addMaintMethod.codeHandler
+      val ch = cf.addMainMethod.codeHandler
 
       // TODO 
 
       ch.freeze
 
       try {
-        classFile.writeToFile(dir)
+        cf.writeToFile(dir)
       } catch {
         case io: java.io.IOException =>
           sys.error("Failed to write file!")
@@ -56,7 +56,7 @@ object CodeGeneration extends Pipeline[Program, Unit] {
     def getTypeCode(t: Type): String = t match {
       case TInt => "I"
       case TBoolean => "Z"
-      case TArray => "A"
+      case TIntArray => "A"
       case TString => "Ljava/lang/String;"
     }
 
@@ -78,17 +78,17 @@ object CodeGeneration extends Pipeline[Program, Unit] {
             case None =>
           }
           ch << Label(endLabel)
-        case While(expr, stat) =>
+        case While(expr, stats) =>
           val loopLabel = ch.getFreshLabel("loop")
           val endLabel = ch.getFreshLabel("end")
           ch << Label(loopLabel)
           generateExprCode(ch, expr)
           ch << Ldc(0) << If_ICmpEq(endLabel)
-          generateStatCode(ch, stat)
+          generateStatCode(ch, stats)
           ch << Goto(loopLabel) << Label(endLabel)
         case Println(expr) =>
           ch << GetStatic("java/lang/System", "out", "Ljava/io/PrintStream;")
-          generateExprCode(expr)
+          generateExprCode(ch, expr)
           ch << InvokeVirtual("java/io/PrintStream", "println", "(" + getTypeCode(expr.getType) + ")V")
         case Assign(id, expr) =>
           // TODO
@@ -106,14 +106,14 @@ object CodeGeneration extends Pipeline[Program, Unit] {
           generateExprCode(ch, lhs)
           ch << Ldc(0) << If_ICmpEq(falseLabel)
           generateExprCode(ch, rhs)
-          ch << Ldc(0) << If_ICmpEq(falseLabel) << Ldc(1) << Goto(endLabel)) << Label(falseLabel) << Ldc(0) << Label(end)
+          ch << Ldc(0) << If_ICmpEq(falseLabel) << Ldc(1) << Goto(endLabel) << Label(falseLabel) << Ldc(0) << Label(endLabel)
         case Or(lhs, rhs) =>
           val trueLabel = ch.getFreshLabel("true")
           val endLabel = ch.getFreshLabel("end")
           generateExprCode(ch, lhs)
           ch << Ldc(1) << If_ICmpEq(trueLabel)
           generateExprCode(ch, rhs)
-          ch << Ldc(1) << If_ICmpEq(trueLabel) << Ldc(0) << Goto(endLabel) << Label(trueLabel) << Ldc(1) << Label(end)
+          ch << Ldc(1) << If_ICmpEq(trueLabel) << Ldc(0) << Goto(endLabel) << Label(trueLabel) << Ldc(1) << Label(endLabel)
         case Plus(lhs, rhs) =>
           (lhs.getType, rhs.getType) match {
             case (TInt, TInt) =>
@@ -145,7 +145,7 @@ object CodeGeneration extends Pipeline[Program, Unit] {
           val endLabel = ch.getFreshLabel("end")
           generateExprCode(ch, lhs)
           generateExprCode(ch, rhs)
-          ch << If_ICmpLt(trueLable) << Ldc(0) << Goto(endLabel) << Label(trueLabel) << Ldc(1) << Label(endLabel)
+          ch << If_ICmpLt(trueLabel) << Ldc(0) << Goto(endLabel) << Label(trueLabel) << Ldc(1) << Label(endLabel)
         case Equals(lhs, rhs) =>
           val trueLabel = ch.getFreshLabel("true")
           val endLabel = ch.getFreshLabel("end")
