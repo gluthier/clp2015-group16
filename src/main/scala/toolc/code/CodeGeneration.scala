@@ -11,6 +11,8 @@ import utils._
 
 object CodeGeneration extends Pipeline[Program, Unit] {
 
+  var ids: Map[Identifier, Int] = Map()
+
   def run(ctx: Context)(prog: Program): Unit = {
     import ctx.reporter._
 
@@ -40,7 +42,7 @@ object CodeGeneration extends Pipeline[Program, Unit] {
       val methSym = mt.getSymbol
 
       // TODO
-      
+
       ch.freeze
     }
 
@@ -91,9 +93,19 @@ object CodeGeneration extends Pipeline[Program, Unit] {
           generateExprCode(ch, expr)
           ch << InvokeVirtual("java/io/PrintStream", "println", "(" + getTypeCode(expr.getType) + ")V")
         case Assign(id, expr) =>
-          // TODO
+          ids.get(id) match {
+            case Some(x) =>
+              generateExprCode(ch, expr)
+              ch << IStore(x)
+            case None => error("Assigning to an id not in the map.")
+          }
         case ArrayAssign(id, index, expr) =>
-          // TODO
+          ids.get(id) match {
+            case Some(x) =>
+              generateExprCode(ch,expr)
+              generateExprCode(ch,index)
+              ch << AStore(x)
+            case None => error("Assigning to an array not in the map")
         case _ => error("Not a statement...")
       }
     }
@@ -121,11 +133,11 @@ object CodeGeneration extends Pipeline[Program, Unit] {
               generateExprCode(ch, rhs)
               ch << IADD
             case (TInt, TString) =>
-              // TODO
+            // TODO
             case (TString, TInt) =>
-              // TODO
+            // TODO
             case (TString, TString) =>
-              // TODO
+            // TODO
             case _ => error("Unable to generate code for expression: wrong types")
           }
         case Minus(lhs, rhs) =>
@@ -160,21 +172,21 @@ object CodeGeneration extends Pipeline[Program, Unit] {
           generateExprCode(ch, arr)
           ch << ARRAYLENGTH
         case MethodCall(obj, meth, args) =>
-          // TODO
+        // TODO
         case IntLit(value) =>
           ch << Ldc(value)
         case StringLit(value) =>
           ch << Ldc(value)
-        case True() => 
+        case True() =>
           ch << Ldc(1)
-        case False() => 
+        case False() =>
           ch << Ldc(0)
         case Identifier(value) =>
-          // TODO
+        // TODO
         case This() =>
           ch << ALOAD_0
         case NewIntArray(size) =>
-          // TODO
+        // TODO
         case New(tpe) =>
           ch << DefaultNew(tpe.value)
         case Not(expr) =>
@@ -184,7 +196,7 @@ object CodeGeneration extends Pipeline[Program, Unit] {
       }
     }
 
-    val outDir = ctx.outDir.map(_.getPath+"/").getOrElse("./")
+    val outDir = ctx.outDir.map(_.getPath + "/").getOrElse("./")
 
     val f = new java.io.File(outDir)
     if (!f.exists()) {
