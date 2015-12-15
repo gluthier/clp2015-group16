@@ -109,6 +109,7 @@ object NameAnalysis extends Pipeline[Program, Program] {
         for (s <- m.stats) {
           checkStatement(m.getSymbol, s)
         }
+        checkExpression(m.getSymbol, m.retExpr)
       }
     }
 
@@ -291,8 +292,8 @@ object NameAnalysis extends Pipeline[Program, Program] {
           }
         case n: New =>
           gS.lookupClass(n.tpe.value) match {
-            case Some(x) => 
-              n.tpe.setSymbol(x);
+            case Some(x) =>
+              n.tpe.setSymbol(x)
               n.setType(retrieveType(n.tpe, gS))
             case None =>
           }
@@ -305,23 +306,22 @@ object NameAnalysis extends Pipeline[Program, Program] {
       }
     }
 
-  prog
+    prog
 
-  }
 
-  def retrieveType(t: TypeTree, gS: GlobalScope): Type = {
-    t match {
-      case IntType() => TInt
-      case BooleanType() => TBoolean
-      case IntArrayType() => TIntArray
-      case StringType() => TString
-      case id: Identifier =>
-        gS.lookupClass(id.value) match {
-          case Some(x) =>
-            id.setSymbol(x)
-            TObject(x)
-          case None => error("Identifier not declared")
-        }
+    def retrieveType(t: TypeTree, gS: GlobalScope): Type = {
+      t match {
+        case IntType() => TInt
+        case BooleanType() => TBoolean
+        case IntArrayType() => TIntArray
+        case StringType() => TString
+        case id: Identifier =>
+          val symb = gS.lookupClass(id.value).get
+          id.setSymbol(symb)
+          TObject(symb)
+      }
     }
+
   }
+
 }
