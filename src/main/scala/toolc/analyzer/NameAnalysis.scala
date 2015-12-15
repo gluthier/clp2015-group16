@@ -89,19 +89,22 @@ object NameAnalysis extends Pipeline[Program, Program] {
       }
 
       for (m <- c.methods) {
-        cs.lookupMethod(m.id.value) match {
+        cs.methods.get(m.id.value) match {
           case Some(x) =>
-            if (x.classSymbol != cs && m.args.size == x.argList.size) {
-              createMethods(m, cs, Some(x))
-            } else if (x.classSymbol == cs) {
-              error("Two methods have the same name!", x)
-            } else {
-              error("Method " + m.id.value + " is overridden!", x)
-            }
+            error("Two methods have the same name!", x)
           case None =>
             createMethods(m, cs, None)
         }
       }
+    }
+
+    for (c <- prog.classes if c.hasSymbol; m <- c.methods; p <- c.getSymbol.parent) {
+      p.lookupMethod(m.id.value) foreach { x =>
+        if (x.argList.size != m.getSymbol.argList.size) error("Method invalidly overriden", x)
+        else m.getSymbol.overridden = Some(x)
+      }
+
+
     }
 
     for (c <- prog.classes) {
@@ -164,17 +167,10 @@ object NameAnalysis extends Pipeline[Program, Program] {
 
       ms.overridden = cs.lookupMethod(m.id.value) match {
         case Some(x) =>
-          if (cs.name.equals(x.classSymbol.name)) {
-            error("Method is overloaded!", ms)
-            Some(x)
-          } else {
-            cs.parent match {
-              case Some(p) =>
-                if (x.params.size != m.args.size) error("Method is overloaded!", x)
-                Some(x)
-              case None => error("Method not overridden!", x); None
-            }
-          }
+          if (x.params.size != m.args.size) error("Method is overloaded!", x)
+          Some(x)
+        case None => error("Method not overridden!", x); None
+
         case None => None
       }
 
