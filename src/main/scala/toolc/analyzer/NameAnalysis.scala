@@ -306,9 +306,6 @@ object NameAnalysis extends Pipeline[Program, Program] {
       }
     }
 
-    prog
-
-
     def retrieveType(t: TypeTree, gS: GlobalScope): Type = {
       t match {
         case IntType() => TInt
@@ -321,6 +318,8 @@ object NameAnalysis extends Pipeline[Program, Program] {
           TObject(symb)
       }
     }
+
+    prog
 
   }
 
