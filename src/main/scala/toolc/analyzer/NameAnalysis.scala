@@ -141,26 +141,15 @@ object NameAnalysis extends Pipeline[Program, Program] {
       m.retType.setType(retrieveType(m.retType, gS))
 
       for (a <- m.args) {
-        ms.lookupVar(a.id.value) match {
-          case Some(x) =>
-            ms.classSymbol.lookupVar(x.name) match {
-              case Some(y) =>
-                val vs = new VariableSymbol(y.name)
-                ms.params += (a.id.value -> vs)
-                a.id.setSymbol(vs)
-                a.setSymbol(vs)
-                vs.setType(retrieveType(a.tpe, gS))
-                a.tpe.setType(retrieveType(a.tpe, gS))
-              case None =>
-                error("Two methods arguments have the same name!", ms)
-            }
+        ms.params get a.id.value match {
+          case Some(x) => error("Already defined", ms)
           case None =>
-            val param = new VariableSymbol(a.id.value)
-            a.setSymbol(param)
-            a.id.setSymbol(param)
-            ms.params += a.id.value -> param
-            ms.argList = ms.argList :+ param
-            param.setType(retrieveType(a.tpe, gS))
+            val vs = new VariableSymbol(a.id.value)
+            ms.params += (a.id.value -> vs)
+            ms.argList = ms.argList :+ vs
+            a.id.setSymbol(vs)
+            a.setSymbol(vs)
+            vs.setType(retrieveType(a.tpe, gS))
             a.tpe.setType(retrieveType(a.tpe, gS))
         }
       }
