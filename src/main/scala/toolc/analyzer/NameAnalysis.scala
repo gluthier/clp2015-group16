@@ -165,15 +165,6 @@ object NameAnalysis extends Pipeline[Program, Program] {
         }
       }
 
-      ms.overridden = cs.lookupMethod(m.id.value) match {
-        case Some(x) =>
-          if (x.params.size != m.args.size) error("Method is overloaded!", x)
-          Some(x)
-        case None => error("Method not overridden!", x); None
-
-        case None => None
-      }
-
       for (me <- m.vars) {
         ms.params get me.id.value match {
           case Some(x) => error("Member is shadowed!", x)
