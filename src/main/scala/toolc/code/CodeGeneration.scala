@@ -8,6 +8,7 @@ import cafebabe._
 import AbstractByteCodes.{New => _, _}
 import ByteCodes._
 import utils._
+import scala.collection.mutable.StringBuilder
 
 object CodeGeneration extends Pipeline[Program, Unit] {
 
@@ -20,17 +21,30 @@ object CodeGeneration extends Pipeline[Program, Unit] {
       cf.setSourceFile(ct.id.value + ".toolc")
       cf.addDefaultConstructor
 
-      val ch = cf.addMainMethod.codeHandler
+      for (v <- ct.vars) {
+        val fh: FieldHandler = cf.addField(getTypeCode(v.tpe.getType), v.id.value)
+      }
 
-      // TODO 
+      for (m <- ct.methods) {
+        var builder: StringBuilder = new StringBuilder()
+
+        for (v <- m.vars) {
+          builder.append(getTypeCode(v.tpe.getType))
+        }
+
+        val mh: MethodHandler = cf.addMethod(getTypeCode(m.retType.getType), m.id.value, builder.toString())
+
+        generateMethodCode(mh.codeHandler, m)
+        mh.codeHandler.freeze
+      }
 
       ch.freeze
 
       try {
-        cf.writeToFile(dir)
+        cf.writeToFile(dir+"/"+ct.id.value+".class")
       } catch {
         case io: java.io.IOException =>
-          sys.error("Failed to write file!")
+          error("Failed to write file!")
       }
     }
 
@@ -39,7 +53,27 @@ object CodeGeneration extends Pipeline[Program, Unit] {
     def generateMethodCode(ch: CodeHandler, mt: MethodDecl): Unit = {
       val methSym = mt.getSymbol
 
-      // TODO
+      for (a <- mt.args) {
+        ids = ids + (a.id -> ch.getFreshVar)
+      }
+
+      for (v <- mt.vars) {
+        ids = ids + (v.id -> ch.getFreshVar)
+      }
+
+      for (s <- mt.stats) {
+        generateStatCode(ch, s)
+      }
+
+      generateExprCode(ch, mt.retExpr)
+
+      mt.retType.getType match {
+        case TInt => ch << IRETURN
+        case TBoolean => ch << IRETURN
+        case TIntArray => ch << ARETURN
+        case TString => ch << ARETURN
+        case _ => ch << IRETURN
+      }
       
       ch.freeze
     }
@@ -58,6 +92,7 @@ object CodeGeneration extends Pipeline[Program, Unit] {
       case TBoolean => "Z"
       case TIntArray => "A"
       case TString => "Ljava/lang/String;"
+      case _ => "I"
     }
 
     def generateStatCode(ch: CodeHandler, stat: StatTree) {
