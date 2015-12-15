@@ -43,9 +43,9 @@ object Main {
 
     val pipeline = Lexer andThen
                    Parser andThen
-                   NameAnalysis /* andThen
+                   NameAnalysis andThen
                    TypeChecking andThen
-                   CodeGeneration*/
+                   CodeGeneration
 
     pipeline.run(ctx)(ctx.file)
 
