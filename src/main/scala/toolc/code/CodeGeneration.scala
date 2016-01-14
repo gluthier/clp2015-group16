@@ -5,326 +5,381 @@ import ast.Trees._
 import analyzer.Symbols._
 import analyzer.Types._
 import cafebabe._
-import AbstractByteCodes.{ New => _, _ }
+import AbstractByteCodes.{New => _, _}
 import ByteCodes._
 import utils._
 
 object CodeGeneration extends Pipeline[Program, Unit] {
-  var symToPos: Map[Symbol, Int] = Map()
+
   def run(ctx: Context)(prog: Program): Unit = {
     import ctx.reporter._
 
-    val outDir = ctx.outDir.map(_.getPath + "/").getOrElse("./")
-    val f = new java.io.File(outDir)
-    if (!f.exists()) {
-      f.mkdir()
-    }
-    val sourceName = ctx.file.getName
-
-    // Now do the main method
-    val classFile = new ClassFile(prog.main.id.value, None)
-    classFile.setSourceFile(sourceName)
-    classFile.addDefaultConstructor
-    val codeHandler = classFile.addMainMethod.codeHandler
-    generateMainMethodCode(codeHandler, prog.main.stats, prog.main.id.value)
-    classFile.writeToFile("./" + outDir + "/" + prog.main.id.value + ".class")
-    def getClassFileTypeT(tpeT: TypeTree): String = {
-      tpeT match {
-        case IntArrayType() => "[I"
-        case IntType()      => "I"
-        case BooleanType()  => "Z"
-        case StringType()   => "Ljava/lang/String;"
-        case i @ Identifier(_) => "L" + i.value
-        case _              => "I"
-      }
-    }
+    // global map representing the slots for the local variables
+    var localVarSlots: List[(String, Int)] = Nil
 
     /** Writes the proper .class file in a given directory. An empty string for dir is equivalent to "./". */
     def generateClassFile(sourceName: String, ct: ClassDecl, dir: String): Unit = {
-      // TODO: Create code handler, save to files ...
-      val parentOption = if (ct.parent.isDefined) Some(ct.parent.get.value) else None
-      val classFile = new ClassFile(ct.id.value, parentOption)
-      classFile.setSourceFile(ct.id.value + ".tool")
-      classFile.addDefaultConstructor
-      for (v <- ct.vars) {
-        val fh: FieldHandler = classFile.addField("toolc/" + v.tpe.getType.toString(), v.id.value)
-      }
-      for (mt <- ct.methods) {
-        var arguList: List[String] = Nil
-        for (v <- mt.vars) {
-          arguList = arguList.+:(getClassFileType(v.tpe.getType))
-        }
-        arguList = arguList.reverse
+      val classFile: ClassFile = if (ct.parent.isDefined) new ClassFile(ct.id.value, Some(ct.parent.get.value))
+      else new ClassFile(ct.id.value, None)
 
-        val mh: MethodHandler = classFile.addMethod(getClassFileTypeT(mt.retType), mt.id.value, arguList: _*)
-        generateMethodCode(mh.codeHandler, mt)
+      // Set source file
+      classFile.setSourceFile(sourceName)
+
+      //Add default constructor
+      classFile.addDefaultConstructor
+
+      // Add fields
+      ct.vars foreach {
+        field => classFile.addField(JVMTypeForTypeTree(field.tpe), field.id.value)
       }
-      classFile.writeToFile("./" + dir + "/" + ct.id.value + ".class")
+
+      //Add methods
+      ct.methods foreach {
+        method => {
+          val argTypes : List[TypeTree] = method.args.map( formal => formal.tpe)
+          val mh:MethodHandler = classFile.addMethod(JVMTypeForTypeTree(method.retType), method.id.value, listJVMTypesII(argTypes))
+          generateMethodCode(mh.codeHandler, method)
+        }
+      }
+
+      // Write .class
+      classFile.writeToFile(dir + ct.id.value + ".class")
     }
 
     // a mapping from variable symbols to positions in the local variables
     // of the stack frame
     def generateMethodCode(ch: CodeHandler, mt: MethodDecl): Unit = {
-      // TODO: Emit code
       val methSym = mt.getSymbol
-      for (arg <- methSym.argList) {
-        symToPos += (arg -> ch.getFreshVar)
-      }
-      for (mem <- methSym.members) {
-        symToPos += (mem._2 -> ch.getFreshVar)
-      }
-      for (s <- mt.stats) {
-        statByteCode(s, ch)
+
+      // Create the slotFor map for local variables
+      //var localVarSlots: List[(String, Int)] = Nil
+      localVarSlots = Nil
+      localVarSlots = localVarSlots ++ assignSlotsForArgs(mt.args, 1)
+
+      // Declare local variables
+      localVarSlots = localVarSlots ++ mt.vars.map(assignSlotForVarDecl(_,ch))
+
+      // Emit code for statements
+      mt.stats foreach {
+        stat => generateStatementCode(ch, stat, methSym)
       }
 
-      exprByteCode(mt.retExpr, ch)
-      mt.retExpr.getType match {
-        case TIntArray  => ch << ARETURN
-        case TObject(_) => ch << ARETURN
-        case TInt       => ch << IRETURN
-        case TBoolean   => ch << IRETURN
-        case TString    => ch << ARETURN
-        case _          => ch << IRETURN
+      // Emit code for return expression (return expression left in top of stack)
+      generateExpressionCode(ch, mt.retExpr, methSym)
+
+      // Emit code to return type
+      mt.retType match {
+        case IntType() => ch << IRETURN
+        case BooleanType() => ch << IRETURN
+        case default => ch << ARETURN
       }
 
       ch.freeze
     }
 
-    def generateMainMethodCode(ch: CodeHandler, stmts: List[StatTree], cname: String): Unit = {
-      // TODO: Emit code
-      for (stat <- stmts) {
-        statByteCode(stat, ch)
+    def assignSlotsForArgs(args: List[Formal], slot: Int): List[(String, Int)] = {
+      if(args.isEmpty) Nil
+      else List((args.head.id.value, slot)) ++ assignSlotsForArgs(args.tail, slot + 1)
+    }
+
+    def assignSlotForVarDecl(variable: VarDecl, ch: CodeHandler): (String, Int) = {
+      (variable.id.value, ch.getFreshVar)
+    }
+
+    // Returns the Int corresponding to the slot assigned to the local variable or None if the variable is global (field)
+    def slotFor(varName: String): Option[Int] = {
+      slotSearch(localVarSlots, varName)
+    }
+
+    def slotSearch(slots: List[(String, Int)], varName: String): Option[Int] = {
+      if(slots.isEmpty) None
+      else
+      if( slots.head._1 == varName ) Some(slots.head._2)
+      else slotSearch(slots.tail, varName)
+    }
+
+    def generateStatementCode(ch: CodeHandler, st: StatTree, ms: MethodSymbol ): Unit = {
+      st match {
+        case stat: Block => {
+          stat.stats.foreach(generateStatementCode(ch, _, ms))
+        }
+        case stat: If => {
+          val nElse = ch.getFreshLabel("nElse")
+          val nAfter = ch.getFreshLabel("nAfter")
+          generateExpressionCode(ch, stat.expr, ms)
+          ch << IfEq(nElse)
+          generateStatementCode(ch, stat.thn, ms)
+          ch << Goto(nAfter)
+          ch << Label(nElse)
+          if(stat.els.isDefined){
+            generateStatementCode(ch, stat.els.get, ms)
+          }
+          ch << Label(nAfter)
+        }
+        case stat: While => {
+          val nStart = ch.getFreshLabel("nStart")
+          val nAfter = ch.getFreshLabel("nAfter")
+          ch << Label(nStart)
+          generateExpressionCode(ch, stat.expr, ms)
+          ch << IfEq(nAfter)
+          generateStatementCode(ch, stat.stat, ms)
+          ch<< Goto(nStart)
+          ch<<Label(nAfter)
+        }
+        case stat: Println => {
+          ch << GetStatic("java/lang/System","out","Ljava/io/PrintStream;")
+          generateExpressionCode(ch, stat.expr, ms)
+          ch << InvokeVirtual("java/io/PrintStream", "println", "("+JVMType(stat.expr.getType)+")V")
+        }
+        case stat: Assign => {
+          if(slotFor(stat.id.value).isDefined){ // Assignment to local variable
+            generateExpressionCode(ch, stat.expr, ms)
+            stat.id.getType match {
+              case TInt | TBoolean => ch << IStore(slotFor(stat.id.value).get)
+              case default => ch << AStore(slotFor(stat.id.value).get)
+            }
+          }
+          else{ // Assignment to global field
+            ch << ALoad(0)
+            generateExpressionCode(ch, stat.expr, ms)
+            ch << PutField(ms.classSymbol.name, stat.id.value, JVMType(stat.id.getType))
+          }
+        }
+        case stat: ArrayAssign => {
+          // Load array
+          if(slotFor(stat.id.value).isDefined){//Local array
+            ch << ALoad(slotFor(stat.id.value).get)
+          }
+          else{
+            ch << ALoad(0)
+            ch << GetField(ms.classSymbol.name, stat.id.value, JVMType(stat.id.getType))
+          }
+          // Set parameters
+          generateExpressionCode(ch, stat.index, ms)
+          generateExpressionCode(ch, stat.expr, ms)
+
+          // Store new int in array
+          ch << IASTORE
+        }
       }
+    }
+
+    def generateExpressionCode(ch: CodeHandler, ex: ExprTree, ms: MethodSymbol): Unit = {
+      ex match{
+        case expr: And => {
+          val nElse = ch.getFreshLabel("nElse")
+          val nAfter = ch.getFreshLabel("nAfter")
+          generateExpressionCode(ch, expr.lhs, ms)
+          ch << IfEq(nElse)
+          generateExpressionCode(ch, expr.rhs, ms)
+          ch << Goto(nAfter)
+          ch << Label(nElse)
+          ch << Ldc(0)
+          ch << Label(nAfter)
+        }
+        case expr: Or => {
+          val nElse = ch.getFreshLabel("nElse")
+          val nAfter = ch.getFreshLabel("nAfter")
+          generateExpressionCode(ch, expr.lhs, ms)
+          ch << IfEq(nElse)
+          ch << Ldc(1)
+          ch << Goto(nAfter)
+          ch << Label(nElse)
+          generateExpressionCode(ch, expr.rhs, ms)
+          ch << Label(nAfter)
+        }
+        case expr: Equals => {
+          val nTrue = ch.getFreshLabel("nTrue")
+          val nAfter = ch.getFreshLabel("nAfter")
+          generateExpressionCode(ch, expr.lhs, ms)
+          generateExpressionCode(ch, expr.rhs, ms)
+          expr.lhs.getType match {
+            case TInt | TBoolean => ch << If_ICmpEq(nTrue)
+            case default => ch << If_ACmpEq(nTrue)
+          }
+          ch << Ldc(0)
+          ch << Goto(nAfter)
+          ch << Label(nTrue)
+          ch << Ldc(1)
+          ch << Label(nAfter)
+        }
+        case expr: LessThan => {
+          val nTrue = ch.getFreshLabel("nTrue")
+          val nAfter = ch.getFreshLabel("nAfter")
+          generateExpressionCode(ch, expr.lhs, ms)
+          generateExpressionCode(ch, expr.rhs, ms)
+          ch << If_ICmpLt(nTrue)
+          ch << Ldc(0)
+          ch << Goto(nAfter)
+          ch << Label(nTrue)
+          ch << Ldc(1)
+          ch << Label(nAfter)
+        }
+        case expr: Plus => {
+          expr.getType match {
+            case TInt => { // Numerical addition
+              generateExpressionCode(ch, expr.lhs, ms)
+              generateExpressionCode(ch, expr.rhs, ms)
+              ch << IADD
+            }
+            case TString => { // Append two strings or string, int
+              ch << DefaultNew("java/lang/StringBuilder")
+              generateExpressionCode(ch, expr.lhs, ms)
+              ch << InvokeVirtual("java/lang/StringBuilder", "append", "(" + JVMType(expr.lhs.getType) + ")Ljava/lang/StringBuilder;")
+              generateExpressionCode(ch, expr.rhs, ms)
+              ch << InvokeVirtual("java/lang/StringBuilder", "append", "(" + JVMType(expr.rhs.getType) + ")Ljava/lang/StringBuilder;")
+              ch << InvokeVirtual("java/lang/StringBuilder", "toString", "()Ljava/lang/String;")
+            }
+            case default => //Unreachable thanks to type checking
+          }
+        }
+        case expr: Minus => {
+          generateExpressionCode(ch, expr.lhs, ms)
+          generateExpressionCode(ch, expr.rhs, ms)
+          ch << ISUB
+        }
+        case expr: Times => {
+          generateExpressionCode(ch, expr.lhs, ms)
+          generateExpressionCode(ch, expr.rhs, ms)
+          ch << IMUL
+        }
+        case expr: Div => {
+          generateExpressionCode(ch, expr.lhs, ms)
+          generateExpressionCode(ch, expr.rhs, ms)
+          ch << IDIV
+        }
+        case expr: ArrayRead =>{
+          generateExpressionCode(ch, expr.arr, ms)
+          generateExpressionCode(ch, expr.index, ms)
+          ch << IALOAD
+        }
+        case expr: ArrayLength => {
+          generateExpressionCode(ch, expr.arr, ms)
+          ch << ARRAYLENGTH
+        }
+        case expr: MethodCall => {// Special consideration to identifier
+          generateExpressionCode(ch, expr.obj, ms)
+          expr.args.foreach(generateExpressionCode(ch, _, ms))
+          expr.meth.getSymbol match {
+            case msCall : MethodSymbol => {
+              val argTypes: List[Type] = msCall.argList.map(x => x.getType)
+              ch << InvokeVirtual(msCall.classSymbol.name , msCall.name , "(" + listJVMTypes(argTypes) + ")" + JVMType(msCall.getType))
+            }
+            case default => //Unreachable code thanks to Type checking
+          }
+
+        }
+        case expr: IntLit => ch << Ldc(expr.value)
+        case expr: StringLit => ch << Ldc(expr.value)
+        case expr: True => ch << Ldc(1)
+        case expr: False => ch << Ldc(0)
+        case expr: Identifier => { // This can only be a variable
+          if(slotFor(expr.value).isDefined){//Local variable
+            expr.getType match {
+              case TInt | TBoolean => ch << ILoad(slotFor(expr.value).get)
+              case default => ch << ALoad(slotFor(expr.value).get)
+            }
+          }
+          else{ // Global variable (field)
+            ch << ALoad(0)
+            ch << GetField(ms.classSymbol.name, expr.value, JVMType(expr.getType))
+          }
+        }
+        case expr: This => ch << ALoad(0)
+        case expr: NewIntArray => {
+          generateExpressionCode(ch, expr.size, ms)
+          ch << NewArray(10)
+        }
+        case expr: New => {
+          ch << DefaultNew(expr.tpe.value)
+        }
+        case expr: Not => {
+          val nElse = ch.getFreshLabel("nElse")
+          val nAfter = ch.getFreshLabel("nAfter")
+          generateExpressionCode(ch, expr.expr, ms)
+          ch << IfEq(nElse)
+          ch << Ldc(0)
+          ch << Goto(nAfter)
+          ch << Label(nElse)
+          ch << Ldc(1)
+          ch << Label(nAfter)
+        }
+      }
+    }
+
+    def generateMainMethodCode(ch: CodeHandler, stmts: List[StatTree], cname: String): Unit = {
+      // Emit code for statements
+      stmts foreach {
+        stat => generateStatementCode(ch, stat, null)
+      }
+
       ch << RETURN
       ch.freeze
     }
 
-    // output code
+    def JVMTypeForTypeTree(tpe: TypeTree): String = tpe match {
+      case IntArrayType() => "[I"
+      case IntType() => "I"
+      case BooleanType() => "Z"
+      case StringType() => "Ljava/lang/String;"
+      case id: Identifier => "L"+ id.value + ";"  // Object Reference
+    }
+
+    def JVMType(tpe: Type): String = tpe match {
+      case TIntArray => "[I"
+      case TInt => "I"
+      case TBoolean => "Z"
+      case TString => "Ljava/lang/String;"
+      case id: TObject => "L"+ id.toString + ";"  // Object Reference
+      case default => {
+        java.lang.System.err.println("Error at code generation: Unassigned type") //TError, TUntyped
+        //System.exit(-1)
+        "ERROR" // Unreachable code
+      }
+    }
+
+    def listJVMTypes(args: List[Type]): String = {
+      val types = args.map(JVMType)
+      types.mkString("")
+    }
+
+    def listJVMTypesII(args: List[TypeTree]): String = {
+      val types = args.map(JVMTypeForTypeTree)
+      types.mkString("")
+    }
+
+    def generateMainClassFile(sourceName: String, main: MainObject, dir: String): Unit = {
+      val classFile: ClassFile =  new ClassFile(main.id.value, None)
+
+      // Set source file
+      classFile.setSourceFile(sourceName)
+
+      //Add default constructor
+      classFile.addDefaultConstructor
+
+      //Add main method
+      val mh: MethodHandler = classFile.addMainMethod
+      generateMainMethodCode(mh.codeHandler, main.stats, main.id.value)
+
+      // Write .class
+      classFile.writeToFile(dir + main.id.value + ".class")
+    }
+
+    val outDir = ctx.outDir.map(_.getPath+"/").getOrElse("./")
+
+    val f = new java.io.File(outDir)
+    if (!f.exists()) {
+      f.mkdir()
+    }
+
+    val sourceName = ctx.file.getName
+
+    generateMainClassFile(sourceName, prog.main ,outDir)
+
     prog.classes foreach {
       ct => generateClassFile(sourceName, ct, outDir)
     }
 
-    def getClassFileType(tpe: Type): String = {
-      tpe match {
-        case TInt        => "I"
-        case TBoolean    => "Z"
-        case TIntArray   => "[I"
-        case TString     => "Ljava/lang/String;"
-        case TObject(cs) => "Lpackage/" + cs.name + ";"
-        case _           => "I"
-      }
-    }
-
-    def statByteCode(stat: StatTree, ch: CodeHandler): Unit = stat match {
-      case Block(stats: List[StatTree]) => stats.foreach { s => statByteCode(s, ch) }
-      case If(expr: ExprTree, thn: StatTree, els: Option[StatTree]) =>
-        val fals = ch.getFreshLabel("false")
-        val end = ch.getFreshLabel("end")
-
-        ch << Ldc(0) //false (0)
-        exprByteCode(expr, ch) //expr
-        ch << If_ICmpEq(fals) //expr == false => go to fals
-        statByteCode(thn, ch) //expr != false
-        ch << Goto(end) //go to end
-        ch << Label(fals) //fals :
-        if (els.isDefined) statByteCode(els.get, ch)
-        ch << Label(end) //end:
-      case While(expr: ExprTree, stat: StatTree) =>
-        val beginLoop = ch.getFreshLabel("begin_loop")
-        val endLoop = ch.getFreshLabel("end_loop")
-
-        ch << Label(beginLoop) //:begin_ loop
-        ch << Ldc(0) //false (0)
-        exprByteCode(expr, ch) // condition
-        ch << If_ICmpEq(endLoop) //condition == false -> endLoop
-        statByteCode(stat, ch) //do
-        ch << Goto(beginLoop) //loop
-        ch << Label(endLoop) //endloop:
-      case Println(expr: ExprTree) =>
-        ch << GetStatic("java/lang/System", "out", "Ljava/io/PrintStream;")
-        exprByteCode(expr, ch)
-        expr.getType match {
-          case TInt => ch << InvokeVirtual("java/io/PrintStream", "println", "(I)V")
-          case TString => ch << InvokeVirtual("java/io/PrintStream", "println", "(Ljava/lang/String;)V")
-          case TBoolean => ch << InvokeVirtual("java/io/PrintStream", "println", "(Z)V")
-          case _ => error("Illegal type for printing")
-        }
-
-      case Assign(id: Identifier, expr: ExprTree) =>
-        symToPos.get(id.getSymbol) match {
-          case Some(i) =>
-            exprByteCode(expr, ch)
-            ch << IStore(i)
-          case None => error("Assigning value to non-defined variable")
-        }
-      case ArrayAssign(id: Identifier, index: ExprTree, expr: ExprTree) =>
-        symToPos.get(id.getSymbol) match {
-          case Some(i) =>
-            exprByteCode(index, ch)
-            exprByteCode(expr, ch)
-            ch << AStore(i)
-          case None => error("Assigning value to non-defined variable")
-        }
-    }
-
-    def exprByteCode(expr: ExprTree, ch: CodeHandler): Unit = expr match {
-      case And(lhs: ExprTree, rhs: ExprTree) =>
-        val fals = ch.getFreshLabel("false")
-        val end = ch.getFreshLabel("end")
-
-        exprByteCode(lhs, ch)
-        ch << IfEq(fals) // lhs == true then rhs
-        ch << Ldc(0) //false
-        ch << Goto(end)
-        ch << Label(fals)
-        exprByteCode(rhs, ch)
-        ch << Label(end)
-
-      case Or(lhs: ExprTree, rhs: ExprTree) =>
-        val tru = ch.getFreshLabel("true")
-        val end = ch.getFreshLabel("end")
-
-        exprByteCode(lhs, ch)
-        ch << IfEq(tru) // lhs == true then true
-        exprByteCode(rhs, ch)
-        ch << Goto(end)
-        ch << Label(tru)
-        ch << Ldc(1)
-        ch << Label(end)
-
-      case Plus(lhs: ExprTree, rhs: ExprTree) => // Attention mélange de types
-        (lhs.getType, rhs.getType) match {
-          case (TInt, TInt) =>
-            exprByteCode(lhs, ch)
-            exprByteCode(rhs, ch)
-            ch << IADD
-          case (TInt, TString)    =>
-            ch << DefaultNew("java/lang/StringBuilder")
-            exprByteCode(lhs, ch)
-            ch << InvokeVirtual("java/lang/StringBuilder", "append", "(I)Ljava/lang/StringBuilder;")
-            exprByteCode(rhs, ch)
-            ch << InvokeVirtual("java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;")
-            ch << InvokeVirtual("java/lang/StringBuilder", "toString", "()Ljava/lang/String;")
-          case (TString, TInt)    =>
-            ch << DefaultNew("java/lang/StringBuilder")
-            exprByteCode(lhs, ch)
-            ch << InvokeVirtual("java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;")
-            exprByteCode(rhs, ch)
-            ch << InvokeVirtual("java/lang/StringBuilder", "append", "(I)Ljava/lang/StringBuilder;")
-            ch << InvokeVirtual("java/lang/StringBuilder", "toString", "()Ljava/lang/String;")
-          case (TString, TString) =>
-            ch << DefaultNew("java/lang/StringBuilder")
-            exprByteCode(lhs, ch)
-            ch << InvokeVirtual("java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;")
-            exprByteCode(rhs, ch)
-            ch << InvokeVirtual("java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;")
-            ch << InvokeVirtual("java/lang/StringBuilder", "toString", "()Ljava/lang/String;")
-          case _ =>
-            error("Addition symbol can be applied with Int and String only")
-        }
-
-      case Minus(lhs: ExprTree, rhs: ExprTree) =>
-        exprByteCode(lhs, ch)
-        exprByteCode(rhs, ch)
-        ch << ISUB
-      case Times(lhs: ExprTree, rhs: ExprTree) =>
-        exprByteCode(lhs, ch)
-        exprByteCode(rhs, ch)
-        ch << IMUL
-      case Div(lhs: ExprTree, rhs: ExprTree) =>
-        exprByteCode(lhs, ch)
-        exprByteCode(rhs, ch)
-        ch << IDIV
-      case LessThan(lhs: ExprTree, rhs: ExprTree) =>
-        val fals = ch.getFreshLabel("false")
-        val end = ch.getFreshLabel("end")
-        exprByteCode(lhs, ch)
-        exprByteCode(rhs, ch)
-        ch << If_ICmpGt(fals)
-        ch << Ldc(1)       // true
-        ch << Goto(end)    // -> end
-        ch << Label(fals)  //fals:
-        ch << Ldc(0)       // false
-        ch << Label(end)   //end:
-      case Equals(lhs: ExprTree, rhs: ExprTree) => // Attention mélange de types
-        val fals = ch.getFreshLabel("false")
-        val end = ch.getFreshLabel("end")
-        exprByteCode(lhs, ch)
-        exprByteCode(rhs, ch)
-        (lhs.getType, rhs.getType) match {
-          case (TInt, TInt) | (TBoolean, TBoolean) =>
-            ch << If_ICmpEq(fals)
-            ch << Ldc(1)          //true
-            ch << Goto(end)       //end:
-            ch << Label(fals)     //fals:
-            ch << Ldc(0)          // false
-            ch << Label(end)      //end:
-          case (TIntArray, TIntArray) | (TString, TString) |  (TObject(_), TObject(_)) =>
-            ch << If_ACmpEq(fals)
-            ch << Ldc(1)          //true
-            ch << Goto(end)       //end:
-            ch << Label(fals)     //fals:
-            ch << Ldc(0)          // false
-            ch << Label(end)      //end:
-          case (_, _) => error("EQUALS : Type mismatch"); ch << POP << POP
-        }
-      case ArrayRead(arr: ExprTree, index: ExprTree) =>
-        exprByteCode(arr, ch)
-        exprByteCode(index, ch)
-        ch << IALOAD
-      case ArrayLength(arr: ExprTree) =>
-        exprByteCode(arr, ch)
-        ch << ARRAYLENGTH
-      case MethodCall(obj: ExprTree, meth: Identifier, args: List[ExprTree]) =>
-        exprByteCode(obj, ch)
-        var str : String = "("
-
-        val ms = meth.getSymbol match {
-          case ms : ClassSymbol => ms.lookupMethod(meth.value).get;
-          case ms : MethodSymbol => ms
-          case _ => fatal("Cannot get symbol from method identifier", meth)
-        }
-
-        for (a <- ms.argList) {
-          str += getClassFileType(a.getType)
-        }
-        str += ")" + getClassFileType(ms.getType)
-        ch << InvokeVirtual(obj.getType.toString(), meth.value, str)
-      case IntLit(value: Int) =>
-        ch << Ldc(value)
-      case StringLit(value: String) =>
-        ch << Ldc(value)
-      case True() =>
-        ch << Ldc(1)
-      case False() =>
-        ch << Ldc(0)
-      case a @ Identifier(value: String)   => a.getType match {
-        case TInt | TBoolean =>
-          if (symToPos.get(a.getSymbol).isDefined) {
-            ch << ILoad(symToPos.get(a.getSymbol).get)
-          } else error("Identifier not intialized")
-        case TIntArray | TString | TObject(_) =>
-          if (symToPos.get(a.getSymbol).isDefined) {
-            ch << ALoad(symToPos.get(a.getSymbol).get)
-          } else error("Identifier not intialized")
-        case _  => error("Unknown Type")
-      }
-      case This()  => ch << ALOAD_0
-      case NewIntArray(size: ExprTree) =>
-        exprByteCode(size, ch)
-        ch << NewArray("I")
-      case New(tpe: Identifier)        => ch << DefaultNew(tpe.value)
-      case Not(expr: ExprTree) =>
-        val fals = ch.getFreshLabel("false")
-        val end = ch.getFreshLabel("end")
-        exprByteCode(expr, ch)
-        ch << Ldc(0)  //false
-        ch << If_ICmpEq(fals)
-        ch << Ldc(0)
-        ch << Goto(end)
-        ch << Label(fals) //fals:
-        ch << Ldc(1)
-        ch << Label(end)
-    }
   }
+
 }
