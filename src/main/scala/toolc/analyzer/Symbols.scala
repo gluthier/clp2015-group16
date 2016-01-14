@@ -63,8 +63,6 @@ object Symbols {
     var argList: List[VariableSymbol] = Nil
     var overridden : Option[MethodSymbol] = None
 
-    var returnType: Trees.TypeTree = null
-
     def lookupVar(n: String): Option[VariableSymbol] =
       members get n orElse (params get n) orElse (classSymbol lookupVar n)
   }

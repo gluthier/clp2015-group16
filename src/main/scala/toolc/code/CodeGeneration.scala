@@ -363,15 +363,14 @@ object CodeGeneration extends Pipeline[Program, Unit] {
               ARRAYLENGTH
           case MethodCall(obj: ExprTree, meth: Identifier, args: List[ExprTree]) =>
 
-            val ms = meth.getSymbol match {
-              case m: MethodSymbol => m
-              case _ => sys.error("Method call failed at code generation")
-            }
+            val ms = meth.getSymbol.asInstanceOf[MethodSymbol]
 
             val methodName = meth.value
             val className = ms.classSymbol.name
-            val methodSig = "(" + ms.argList.foldLeft("")((acc, arg) => acc +
-              toByteCodeTypes(arg.getType)) + ")" + toByteCodeType(ms.returnType)
+            val methodSig = "(" + ms.argList.foldLeft(""){(acc, arg) =>
+              assert(arg.getType != null)
+              acc +
+              toByteCodeTypes(arg.getType)} + ")" + toByteCodeTypes(ms.getType)
 
             val s = List(compileExpr(obj, ch)) ::: args.map(compileExpr(_, ch))
             s.foldLeft(ch)((ch, bcg) => ch << bcg) <<

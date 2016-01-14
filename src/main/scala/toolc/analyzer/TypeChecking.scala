@@ -89,6 +89,7 @@ object TypeChecking extends Pipeline[Program, Program] {
             case TObject(cs) =>
               cs.lookupMethod(meth.value) match {
                 case Some(x) =>
+                  meth.setSymbol(x)
                   val zip = args zip x.argList.map(_.getType)
                   for (z <- zip) {
                     tcExpr(z._1, z._2)
