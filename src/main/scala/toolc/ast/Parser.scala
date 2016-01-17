@@ -96,7 +96,9 @@ object Parser extends Pipeline[Iterator[Token], Program] {
         val id = parseIdentifier
         eat(COLON)
         val tpe = parseType
-        eat(SEMICOLON)
+		if (currentToken.kind == SEMICOLON) {
+        	eat(SEMICOLON)
+		}
         new VarDecl(tpe, id)
     }
 
@@ -133,7 +135,9 @@ object Parser extends Pipeline[Iterator[Token], Program] {
         }
         eat(RETURN)
         val retExpr = parseExpression
-        eat(SEMICOLON)
+		if (currentToken.kind == SEMICOLON) {
+        	eat(SEMICOLON)
+		}
         eat(RBRACE)
         new MethodDecl(retType, id, args.reverse, vars.reverse, stats.reverse, retExpr)
     }
@@ -196,7 +200,9 @@ object Parser extends Pipeline[Iterator[Token], Program] {
                 eat(LPAREN)
                 val expr = parseExpression
                 eat(RPAREN)
-                eat(SEMICOLON)
+				if (currentToken.kind == SEMICOLON) {
+		        	eat(SEMICOLON)
+				}
                 new Println(expr)
             case _ =>
                 val id = parseIdentifier
@@ -204,7 +210,9 @@ object Parser extends Pipeline[Iterator[Token], Program] {
                     case EQSIGN =>
                         eat(EQSIGN)
                         val expr = parseExpression
-                        eat(SEMICOLON)
+						if (currentToken.kind == SEMICOLON) {
+				        	eat(SEMICOLON)
+						}
                         new Assign(id, expr)
                     case LBRACKET =>
                         eat(LBRACKET)
@@ -212,7 +220,9 @@ object Parser extends Pipeline[Iterator[Token], Program] {
                         eat(RBRACKET)
                         eat(EQSIGN)
                         val expr = parseExpression
-                        eat(SEMICOLON)
+						if (currentToken.kind == SEMICOLON) {
+				        	eat(SEMICOLON)
+						}
                         new ArrayAssign(id, index, expr)
                     case _ => expected(EQSIGN, LBRACKET)
                 }
@@ -225,7 +235,17 @@ object Parser extends Pipeline[Iterator[Token], Program] {
         currentToken.kind match {
             case OR =>
                 eat(OR)
-                parseOr(new Or(lhs, parseAndExpr))
+				lhs.getType match {
+					case TObject =>
+						lhs.classSymbol.lookupMethod("||") match {
+							case Some(ms) =>
+								parseOr(new MethodCall(lhs, ms.id, parseAndExpr))
+							case None =>
+								fatal("|| method is not defined for Object " + lhs.toString)
+						}
+					case _ =>
+						parseOr(new Or(lhs, parseAndExpr))
+				}
             case _ => lhs
         }
     }
@@ -236,7 +256,17 @@ object Parser extends Pipeline[Iterator[Token], Program] {
         currentToken.kind match {
             case AND =>
                 eat(AND)
-                parseAnd(new And(lhs, parseLessThanEqualsExpr))
+				lhs.getType match {
+					case TObject =>
+						lhs.classSymbol.lookupMethod("&&") match {
+							case Some(ms) =>
+								parseAnd(new MethodCall(lhs, ms.id, parseLessThanEqualsExpr))
+							case None =>
+								fatal("&& method is not defined for Object " + lhs.toString)
+						}
+					case _ =>
+						parseAnd(new And(lhs, parseLessThanEqualsExpr))
+				}
             case _ => lhs
         }
     }
@@ -247,10 +277,30 @@ object Parser extends Pipeline[Iterator[Token], Program] {
         currentToken.kind match {
             case LESSTHAN =>
                 eat(LESSTHAN)
-                parseLessThanEquals(new LessThan(lhs, parsePlusMinusExpr))
+				lhs.getType match {
+					case TObject =>
+						lhs.classSymbol.lookupMethod("<") match {
+							case Some(ms) =>
+								parseLessThanEquals(new MethodCall(lhs, ms.id, parsePlusMinusExpr))
+							case None =>
+								fatal("< method is not defined for Object " + lhs.toString)
+						}
+					case _ =>
+						parseLessThanEquals(new LessThan(lhs, parsePlusMinusExpr))
+				}
             case EQUALS =>
                 eat(EQUALS)
-                parseLessThanEquals(new Equals(lhs, parsePlusMinusExpr))
+				lhs.getType match {
+					case TObject =>
+						lhs.classSymbol.lookupMethod("==") match {
+							case Some(ms) =>
+								parseLessThanEquals(new MethodCall(lhs, ms.id, parsePlusMinusExpr))
+							case None =>
+								fatal("== method is not defined for Object " + lhs.toString)
+						}
+					case _ =>
+						parseLessThanEquals(new Equals(lhs, parsePlusMinusExpr))
+				}
             case _ => lhs
         }
     }
@@ -261,10 +311,30 @@ object Parser extends Pipeline[Iterator[Token], Program] {
         currentToken.kind match {
             case PLUS =>
                 eat(PLUS)
-                parsePlusMinus(new Plus(lhs, parseTimesDivExpr))
+				lhs.getType match {
+					case TObject =>
+						lhs.classSymbol.lookupMethod("+") match {
+							case Some(ms) =>
+								parsePlusMinus(new MethodCall(lhs, ms.id, parseTimesDivExpr))
+							case None =>
+								fatal("+ method is not defined for Object " + lhs.toString)
+						}
+					case _ =>
+						parsePlusMinus(new Plus(lhs, parseTimesDivExpr))
+				}
             case MINUS =>
                 eat(MINUS)
-                parsePlusMinus(new Minus(lhs, parseTimesDivExpr))
+				lhs.getType match {
+					case TObject =>
+						lhs.classSymbol.lookupMethod("-") match {
+							case Some(-) =>
+								parsePlusMinus(new MethodCall(lhs, ms.id, parseTimesDivExpr))
+							case None =>
+								fatal("- method is not defined for Object " + lhs.toString)
+						}
+					case _ =>
+						parsePlusMinus(new Minus(lhs, parseTimesDivExpr))
+				}
             case _ => lhs
         }
     }
@@ -275,10 +345,30 @@ object Parser extends Pipeline[Iterator[Token], Program] {
         currentToken.kind match {
             case TIMES =>
                 eat(TIMES)
-                parseTimesDiv(new Times(lhs, parseBangExpr))
+				lhs.getType match {
+					case TObject =>
+						lhs.classSymbol.lookupMethod("*") match {
+							case Some(ms) =>
+								parseTimesDiv(new MethodCall(lhs, ms.id, parseBangExpr))
+							case None =>
+								fatal("* method is not defined for Object " + lhs.toString)
+						}
+					case _ =>
+						parseTimesDiv(new Times(lhs, parseBangExpr))
+				}
             case DIV =>
                 eat(DIV)
-                parseTimesDiv(new Div(lhs, parseBangExpr))
+				lhs.getType match {
+					case TObject =>
+						lhs.classSymbol.lookupMethod("/") match {
+							case Some(ms) =>
+								parseTimesDiv(new MethodCall(lhs, ms.id, parseBangExpr))
+							case None =>
+								fatal("/ method is not defined for Object " + lhs.toString)
+						}
+					case _ =>
+						parseTimesDiv(new Div(lhs, parseBangExpr))
+				}
             case _ => lhs
         }
     }
@@ -289,7 +379,18 @@ object Parser extends Pipeline[Iterator[Token], Program] {
         currentToken.kind match {
             case BANG =>
                 eat(BANG)
-                parseNext(new Not(parseNextExpr))
+				val nextExpr = parseNextExpr
+				nextExpr.getType match {
+					case TObject =>
+						nextExpr.classSymbol.lookupMethod("!") match {
+							case Some(ms) =>
+								parseNext(new MethodCall(nextExpr, ms.id, parseNextExpr))
+							case None =>
+								fatal("! method is not defined for Object " + lhs.toString)
+						}
+					case _ =>
+						parseNext(new Not(nextExpr))
+				}
             case _ => parseBangExpr
         }
     }
