@@ -5,6 +5,7 @@ import utils._
 import Trees._
 import lexer._
 import lexer.Tokens._
+import analyzer.Types._
 
 object Parser extends Pipeline[Iterator[Token], Program] {
   def run(ctx: Context)(tokens: Iterator[Token]): Program = {
@@ -266,10 +267,10 @@ object Parser extends Pipeline[Iterator[Token], Program] {
             case OR =>
                 eat(OR)
 				lhs.getType match {
-					case TObject =>
-						lhs.classSymbol.lookupMethod("||") match {
+					case TObject(cs) =>
+						cs.lookupMethod("||") match {
 							case Some(ms) =>
-								parseOr(new MethodCall(lhs, ms.id, parseAndExpr))
+								parseOr(new MethodCall(lhs, new Identifier("||"), List(parseAndExpr)))
 							case None =>
 								fatal("|| method is not defined for Object " + lhs.toString)
 						}
@@ -287,10 +288,10 @@ object Parser extends Pipeline[Iterator[Token], Program] {
             case AND =>
                 eat(AND)
 				lhs.getType match {
-					case TObject =>
-						lhs.classSymbol.lookupMethod("&&") match {
+					case TObject(cs) =>
+						cs.lookupMethod("&&") match {
 							case Some(ms) =>
-								parseAnd(new MethodCall(lhs, ms.id, parseLessThanEqualsExpr))
+								parseAnd(new MethodCall(lhs, new Identifier("&&"), List(parseLessThanEqualsExpr)))
 							case None =>
 								fatal("&& method is not defined for Object " + lhs.toString)
 						}
@@ -308,10 +309,10 @@ object Parser extends Pipeline[Iterator[Token], Program] {
             case LESSTHAN =>
                 eat(LESSTHAN)
 				lhs.getType match {
-					case TObject =>
-						lhs.classSymbol.lookupMethod("<") match {
+					case TObject(cs) =>
+						cs.lookupMethod("<") match {
 							case Some(ms) =>
-								parseLessThanEquals(new MethodCall(lhs, ms.id, parsePlusMinusExpr))
+								parseLessThanEquals(new MethodCall(lhs, new Identifier("<"), List(parsePlusMinusExpr)))
 							case None =>
 								fatal("< method is not defined for Object " + lhs.toString)
 						}
@@ -321,10 +322,10 @@ object Parser extends Pipeline[Iterator[Token], Program] {
             case EQUALS =>
                 eat(EQUALS)
 				lhs.getType match {
-					case TObject =>
-						lhs.classSymbol.lookupMethod("==") match {
+					case TObject(cs) =>
+						cs.lookupMethod("==") match {
 							case Some(ms) =>
-								parseLessThanEquals(new MethodCall(lhs, ms.id, parsePlusMinusExpr))
+								parseLessThanEquals(new MethodCall(lhs, new Identifier("=="), List(parsePlusMinusExpr)))
 							case None =>
 								fatal("== method is not defined for Object " + lhs.toString)
 						}
@@ -342,10 +343,10 @@ object Parser extends Pipeline[Iterator[Token], Program] {
             case PLUS =>
                 eat(PLUS)
 				lhs.getType match {
-					case TObject =>
-						lhs.classSymbol.lookupMethod("+") match {
+					case TObject(cs) =>
+						cs.lookupMethod("+") match {
 							case Some(ms) =>
-								parsePlusMinus(new MethodCall(lhs, ms.id, parseTimesDivExpr))
+								parsePlusMinus(new MethodCall(lhs, new Identifier("+"), List(parseTimesDivExpr)))
 							case None =>
 								fatal("+ method is not defined for Object " + lhs.toString)
 						}
@@ -355,10 +356,10 @@ object Parser extends Pipeline[Iterator[Token], Program] {
             case MINUS =>
                 eat(MINUS)
 				lhs.getType match {
-					case TObject =>
-						lhs.classSymbol.lookupMethod("-") match {
-							case Some(-) =>
-								parsePlusMinus(new MethodCall(lhs, ms.id, parseTimesDivExpr))
+					case TObject(cs) =>
+						cs.lookupMethod("-") match {
+							case Some(ms) =>
+								parsePlusMinus(new MethodCall(lhs, new Identifier("-"), List(parseTimesDivExpr)))
 							case None =>
 								fatal("- method is not defined for Object " + lhs.toString)
 						}
@@ -376,10 +377,10 @@ object Parser extends Pipeline[Iterator[Token], Program] {
             case TIMES =>
                 eat(TIMES)
 				lhs.getType match {
-					case TObject =>
-						lhs.classSymbol.lookupMethod("*") match {
+					case TObject(cs) =>
+						cs.lookupMethod("*") match {
 							case Some(ms) =>
-								parseTimesDiv(new MethodCall(lhs, ms.id, parseBangExpr))
+								parseTimesDiv(new MethodCall(lhs, new Identifier("*"), List(parseBangExpr)))
 							case None =>
 								fatal("* method is not defined for Object " + lhs.toString)
 						}
@@ -389,10 +390,10 @@ object Parser extends Pipeline[Iterator[Token], Program] {
             case DIV =>
                 eat(DIV)
 				lhs.getType match {
-					case TObject =>
-						lhs.classSymbol.lookupMethod("/") match {
+					case TObject(cs) =>
+						cs.lookupMethod("/") match {
 							case Some(ms) =>
-								parseTimesDiv(new MethodCall(lhs, ms.id, parseBangExpr))
+								parseTimesDiv(new MethodCall(lhs, new Identifier("/"), List(parseBangExpr)))
 							case None =>
 								fatal("/ method is not defined for Object " + lhs.toString)
 						}
@@ -411,12 +412,12 @@ object Parser extends Pipeline[Iterator[Token], Program] {
                 eat(BANG)
 				val nextExpr = parseNextExpr
 				nextExpr.getType match {
-					case TObject =>
-						nextExpr.classSymbol.lookupMethod("!") match {
+					case TObject(cs) =>
+						cs.lookupMethod("!") match {
 							case Some(ms) =>
-								parseNext(new MethodCall(nextExpr, ms.id, parseNextExpr))
+								parseNext(new MethodCall(nextExpr, new Identifier("!"), List(parseNextExpr)))
 							case None =>
-								fatal("! method is not defined for Object " + lhs.toString)
+								fatal("! method is not defined for Object " + nextExpr.toString)
 						}
 					case _ =>
 						parseNext(new Not(nextExpr))
@@ -447,6 +448,150 @@ object Parser extends Pipeline[Iterator[Token], Program] {
                     case LENGTH =>
                         eat(LENGTH)
                         parseNext(new ArrayLength(lhs))
+					case OR =>
+						eat(OR)
+						eat(LPAREN)
+						val args = parseArgumentsMethod
+						eat(RPAREN)
+						lhs.getType match {
+							case TObject(cs) =>
+								cs.lookupMethod("||") match {
+									case Some(ms) =>
+										parseNext(new MethodCall(lhs, new Identifier("||"), args))
+									case None =>
+										fatal("|| method is not defined for Object " + lhs.toString)
+								}
+							case _ =>
+								fatal("not an Object")
+						}
+					case AND =>
+						eat(AND)
+						eat(LPAREN)
+						val args = parseArgumentsMethod
+						eat(RPAREN)
+						lhs.getType match {
+							case TObject(cs) =>
+								cs.lookupMethod("&&") match {
+									case Some(ms) =>
+										parseNext(new MethodCall(lhs, new Identifier("&&"), args))
+									case None =>
+										fatal("&& method is not defined for Object " + lhs.toString)
+								}
+							case _ =>
+								fatal("not an Object")
+						}
+					case LESSTHAN =>
+						eat(LESSTHAN)
+						eat(LPAREN)
+						val args = parseArgumentsMethod
+						eat(RPAREN)
+						lhs.getType match {
+							case TObject(cs) =>
+								cs.lookupMethod("<") match {
+									case Some(ms) =>
+										parseNext(new MethodCall(lhs, new Identifier("<"), args))
+									case None =>
+										fatal("< method is not defined for Object " + lhs.toString)
+								}
+							case _ =>
+								fatal("not an Object")
+						}
+					case EQUALS =>
+						eat(EQUALS)
+						eat(LPAREN)
+						val args = parseArgumentsMethod
+						eat(RPAREN)
+						lhs.getType match {
+							case TObject(cs) =>
+								cs.lookupMethod("==") match {
+									case Some(ms) =>
+										parseNext(new MethodCall(lhs, new Identifier("=="), args))
+									case None =>
+										fatal("== method is not defined for Object " + lhs.toString)
+								}
+							case _ =>
+								fatal("not an Object")
+						}
+					case PLUS =>
+						eat(PLUS)
+						eat(LPAREN)
+						val args = parseArgumentsMethod
+						eat(RPAREN)
+						lhs.getType match {
+							case TObject(cs) =>
+								cs.lookupMethod("+") match {
+									case Some(ms) =>
+										parseNext(new MethodCall(lhs, new Identifier("+"), args))
+									case None =>
+										fatal("+ method is not defined for Object " + lhs.toString)
+								}
+							case _ =>
+								fatal("not an Object")
+						}
+					case MINUS =>
+						eat(MINUS)
+						eat(LPAREN)
+						val args = parseArgumentsMethod
+						eat(RPAREN)
+						lhs.getType match {
+							case TObject(cs) =>
+								cs.lookupMethod("-") match {
+									case Some(ms) =>
+										parseNext(new MethodCall(lhs, new Identifier("-"), args))
+									case None =>
+										fatal("- method is not defined for Object " + lhs.toString)
+								}
+							case _ =>
+								fatal("not an Object")
+						}
+					case TIMES =>
+						eat(TIMES)
+						eat(LPAREN)
+						val args = parseArgumentsMethod
+						eat(RPAREN)
+						lhs.getType match {
+							case TObject(cs) =>
+								cs.lookupMethod("*") match {
+									case Some(ms) =>
+										parseNext(new MethodCall(lhs, new Identifier("*"), args))
+									case None =>
+										fatal("* method is not defined for Object " + lhs.toString)
+								}
+							case _ =>
+								fatal("not an Object")
+						}
+					case DIV =>
+						eat(DIV)
+						eat(LPAREN)
+						val args = parseArgumentsMethod
+						eat(RPAREN)
+						lhs.getType match {
+							case TObject(cs) =>
+								cs.lookupMethod("/") match {
+									case Some(ms) =>
+										parseNext(new MethodCall(lhs, new Identifier("/"), args))
+									case None =>
+										fatal("/ method is not defined for Object " + lhs.toString)
+								}
+							case _ =>
+								fatal("not an Object")
+						}
+					case BANG =>
+						eat(BANG)
+						eat(LPAREN)
+						val args = parseArgumentsMethod
+						eat(RPAREN)
+						lhs.getType match {
+							case TObject(cs) =>
+								cs.lookupMethod("!") match {
+									case Some(ms) =>
+										parseNext(new MethodCall(lhs, new Identifier("!"), args))
+									case None =>
+										fatal("! method is not defined for Object " + lhs.toString)
+								}
+							case _ =>
+								fatal("not an Object")
+						}
                     case _ =>
                         currentToken match {
                             case x: ID =>
@@ -455,152 +600,8 @@ object Parser extends Pipeline[Iterator[Token], Program] {
                                 val args = parseArgumentsMethod
                                 eat(RPAREN)
                                 parseNext(new MethodCall(lhs, new Identifier(x.value), args.reverse))
-							case OR =>
-								eat(OR)
-                                eat(LPAREN)
-                                val args = parseArgumentsMethod
-                                eat(RPAREN)
-								lhs.getType match {
-									case TObject =>
-										lhs.classSymbol.lookupMethod("||") match {
-											case Some(ms) =>
-												parseNext(new MethodCall(lhs, ms.id, args))
-											case None =>
-												fatal("|| method is not defined for Object " + lhs.toString)
-										}
-									case _ =>
-										fatal("not an Object")
-								}
-							case AND =>
-								eat(AND)
-                                eat(LPAREN)
-                                val args = parseArgumentsMethod
-                                eat(RPAREN)
-								lhs.getType match {
-									case TObject =>
-										lhs.classSymbol.lookupMethod("&&") match {
-											case Some(ms) =>
-												parseNext(new MethodCall(lhs, ms.id, args))
-											case None =>
-												fatal("&& method is not defined for Object " + lhs.toString)
-										}
-									case _ =>
-										fatal("not an Object")
-								}
-							case LESSTHAN =>
-								eat(LESSTHAN)
-                                eat(LPAREN)
-                                val args = parseArgumentsMethod
-                                eat(RPAREN)
-								lhs.getType match {
-									case TObject =>
-										lhs.classSymbol.lookupMethod("<") match {
-											case Some(ms) =>
-												parseNext(new MethodCall(lhs, ms.id, args))
-											case None =>
-												fatal("< method is not defined for Object " + lhs.toString)
-										}
-									case _ =>
-										fatal("not an Object")
-								}
-							case EQUALS =>
-								eat(EQUALS)
-                                eat(LPAREN)
-                                val args = parseArgumentsMethod
-                                eat(RPAREN)
-								lhs.getType match {
-									case TObject =>
-										lhs.classSymbol.lookupMethod("==") match {
-											case Some(ms) =>
-												parseNext(new MethodCall(lhs, ms.id, args))
-											case None =>
-												fatal("== method is not defined for Object " + lhs.toString)
-										}
-									case _ =>
-										fatal("not an Object")
-								}
-							case PLUS =>
-								eat(PLUS)
-                                eat(LPAREN)
-                                val args = parseArgumentsMethod
-                                eat(RPAREN)
-								lhs.getType match {
-									case TObject =>
-										lhs.classSymbol.lookupMethod("+") match {
-											case Some(ms) =>
-												parseNext(new MethodCall(lhs, ms.id, args))
-											case None =>
-												fatal("+ method is not defined for Object " + lhs.toString)
-										}
-									case _ =>
-										fatal("not an Object")
-								}
-							case MINUS =>
-								eat(MINUS)
-                                eat(LPAREN)
-                                val args = parseArgumentsMethod
-                                eat(RPAREN)
-								lhs.getType match {
-									case TObject =>
-										lhs.classSymbol.lookupMethod("-") match {
-											case Some(ms) =>
-												parseNext(new MethodCall(lhs, ms.id, args))
-											case None =>
-												fatal("- method is not defined for Object " + lhs.toString)
-										}
-									case _ =>
-										fatal("not an Object")
-								}
-							case TIMES =>
-								eat(TIMES)
-                                eat(LPAREN)
-                                val args = parseArgumentsMethod
-                                eat(RPAREN)
-								lhs.getType match {
-									case TObject =>
-										lhs.classSymbol.lookupMethod("*") match {
-											case Some(ms) =>
-												parseNext(new MethodCall(lhs, ms.id, args))
-											case None =>
-												fatal("* method is not defined for Object " + lhs.toString)
-										}
-									case _ =>
-										fatal("not an Object")
-								}
-							case DIV =>
-								eat(DIV)
-                                eat(LPAREN)
-                                val args = parseArgumentsMethod
-                                eat(RPAREN)
-								lhs.getType match {
-									case TObject =>
-										lhs.classSymbol.lookupMethod("/") match {
-											case Some(ms) =>
-												parseNext(new MethodCall(lhs, ms.id, args))
-											case None =>
-												fatal("/ method is not defined for Object " + lhs.toString)
-										}
-									case _ =>
-										fatal("not an Object")
-								}
-							case BANG =>
-								eat(BANG)
-                                eat(LPAREN)
-                                val args = parseArgumentsMethod
-                                eat(RPAREN)
-								lhs.getType match {
-									case TObject =>
-										lhs.classSymbol.lookupMethod("!") match {
-											case Some(ms) =>
-												parseNext(new MethodCall(lhs, ms.id, args))
-											case None =>
-												fatal("! method is not defined for Object " + lhs.toString)
-										}
-									case _ =>
-										fatal("not an Object")
-								}
                             case _ =>
-								expected(IDKIND, OR, AND, LESSTHAN, EQUALS, PLUS, MINUS, TIMES, DIV, BANG)
+								expected(IDKIND)
                         }
                 }
             case LBRACKET =>
