@@ -5,7 +5,6 @@ import utils._
 import Trees._
 import lexer._
 import lexer.Tokens._
-import analyzer.Types._
 
 object Parser extends Pipeline[Iterator[Token], Program] {
   def run(ctx: Context)(tokens: Iterator[Token]): Program = {
