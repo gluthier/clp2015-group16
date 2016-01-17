@@ -104,7 +104,37 @@ object Parser extends Pipeline[Iterator[Token], Program] {
 
     def parseMethodDecl: MethodDecl = {
         eat(DEF)
-        val id = parseIdentifier
+		val id = currentToken.kind match {
+			case OR =>
+				eat(OR)
+				new Identifier("||")
+			case AND =>
+				eat(AND)
+				new Identifier("&&")
+			case LESSTHAN =>
+				eat(LESSTHAN)
+				new Identifier("<")
+			case EQUALS =>
+				eat(EQUALS)
+				new Identifier("==")
+			case PLUS =>
+				eat(PLUS)
+				new Identifier("+")
+			case MINUS =>
+				eat(MINUS)
+				new Identifier("-")
+			case TIMES =>
+				eat(TIMES)
+				new Identifier("*")
+			case DIV =>
+				eat(DIV)
+				new Identifier("/")
+			case BANG =>
+				eat(BANG)
+				new Identifier("!")
+			case _ =>
+				parseIdentifier
+		}
         eat(LPAREN)
         var args: List[Formal] = Nil
         if (currentToken.kind == IDKIND) {
