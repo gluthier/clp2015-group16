@@ -427,7 +427,14 @@ object Parser extends Pipeline[Iterator[Token], Program] {
                 val index = parseExpression
                 eat(RBRACKET)
                 parseNext(new ArrayRead(lhs, index))
-            case _ => lhs
+            case _ =>
+				currentToken match {
+					case x: ID =>
+						val methodID = parseIdentifier
+						val arg = parseExpression
+						parseNext(new MethodCall(lhs, methodID, List(arg)))
+					case _ => lhs
+				}
         }
     }
 
