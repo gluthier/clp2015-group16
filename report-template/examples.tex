@@ -28,7 +28,7 @@ class Tester {
 
 \subsection{Methods as infix operators}
 
-This extesion allow us to call methods not only in prefix form but also as infix operators. It is only allowed to use this form when methods have one argument.
+This extension allows us to call methods not only in prefix form but also in an infix way. As stated before, only methods that have one argument can be called in this way.
 
 \begin{lstlisting}
 object InfixMethods {
@@ -42,7 +42,7 @@ class Tester {
 		var myObject : Object
 		myObject = new Object().init()
 
-		return myObject infix_method 6
+		return myObject add 6
     }
 }
 
@@ -54,7 +54,7 @@ class Object {
 		return this
 	}
 
-	def infix_method(a: Int) : Int = {
+	def add(a: Int) : Int = {
 		return value + a
 	}
 }
@@ -62,11 +62,42 @@ class Object {
 
 \subsection{Expressions as statements}
 
-This extension allow to use expressions also when we previously expected a statement.
+This extension allow to use expressions where a statement was previously expected.
 
 \begin{lstlisting}
+object InfixMethods {
+    def main() : Unit = {
+        println(new Tester().test())
+    }
+}
 
+class Tester {
+    def test() : Int = {
+		var myObject : Object
+		myObject = new Object().init()
+		
+		myObject resetTo 1
+
+		return myObject add 6
+    }
+}
+
+class Object {
+	var value : Int
+
+	def init() : Object = {
+		value = 14
+		return this
+	}
+	
+	def resetTo(x: Int) : Int = {
+	    value = x
+	    return 0
+	}
+}
 \end{lstlisting}
+
+You can notice that the return value of \lstinline$myObject resetTo 1$ was not assigned to any variable, but that it's action is still executed.
 
 \subsection{Operators as methods}
 
@@ -87,7 +118,7 @@ class Tester {
 		a = new ArbitraryObject().init()
 		b = new ArbitraryObject().init()
 
-		return a.+(b)
+		return a.+(b) // or a + b
     }
 }
 
