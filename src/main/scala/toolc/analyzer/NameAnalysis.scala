@@ -198,6 +198,8 @@ object NameAnalysis extends Pipeline[Program, Program] {
           checkExpression(m, array.id)
           checkExpression(m, array.index)
           checkExpression(m, array.expr)
+        case _ =>
+
       }
     }
 

@@ -156,6 +156,7 @@ object TypeChecking extends Pipeline[Program, Program] {
           tcExpr(id, TIntArray)
           tcExpr(index, TInt)
           tcExpr(expr, TInt)
+        case _ =>
       }
     }
    
