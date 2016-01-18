@@ -1,0 +1,103 @@
+\subsection{Semicolon inference}
+
+This extension allow us to write code without any semicolon at the end of the lines. We can still specify it if wanted. It is compulsory if we want to write multiple statements in one line.
+
+\begin{lstlisting}
+object SemiColonInference {
+    def main() : Unit = {
+        println(new Tester().test())
+    }
+}
+
+class Tester {
+    def test() : Int = {
+			var a : Int
+			var b : Int
+
+			a = 1; b = 2
+
+			a =
+				a
+				+ b
+				* 4
+
+			return a
+    }
+}
+\end{lstlisting}
+
+\subsection{Methods as infix operators}
+
+This extesion allow us to call methods not only in prefix form but also as infix operators. It is only allowed to use this form when methods have one argument.
+
+\begin{lstlisting}
+object InfixMethods {
+    def main() : Unit = {
+        println(new Tester().test())
+    }
+}
+
+class Tester {
+    def test() : Int = {
+		var myObject : Object
+		myObject = new Object().init()
+
+		return myObject infix_method 6
+    }
+}
+
+class Object {
+	var value : Int
+
+	def init() : Object = {
+		value = 14
+		return this
+	}
+
+	def infix_method(a: Int) : Int = {
+		return value + a
+	}
+}
+\end{lstlisting}
+
+\subsection{Expressions as statements}
+
+This extension allow to use expressions also when we previously expected a statement.
+
+\begin{lstlisting}
+
+\end{lstlisting}
+
+\subsection{Operators as methods}
+
+This extension allow us to name methods with operators, such as \lstinline$||$, \lstinline$&&$, \lstinline$<$, \lstinline$==$, \lstinline$+$, \lstinline$-$, \lstinline$*$, \lstinline$/$ or \lstinline$!$.
+
+\begin{lstlisting}
+object OperatorsAsMethods {
+    def main() : Unit = {
+        println(new Tester().test())
+    }
+}
+
+class Tester {
+    def test() : Int = {
+		var a: ArbitraryObject
+		var b: ArbitraryObject
+
+		a = new ArbitraryObject().init()
+		b = new ArbitraryObject().init()
+
+		return a.+(b)
+    }
+}
+
+class ArbitraryObject {
+	def init() : ArbitraryObject = {
+		return this;
+	}
+
+	def +(b: ArbitraryObject): Int = {
+		return 100
+	}
+}
+\end{lstlisting}
