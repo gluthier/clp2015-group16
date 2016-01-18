@@ -96,13 +96,45 @@ object Parser extends Pipeline[Iterator[Token], Program] {
         val id = parseIdentifier
         eat(COLON)
         val tpe = parseType
-        eat(SEMICOLON)
+		if (currentToken.kind == SEMICOLON) {
+        	eat(SEMICOLON)
+		}
         new VarDecl(tpe, id)
     }
 
     def parseMethodDecl: MethodDecl = {
         eat(DEF)
-        val id = parseIdentifier
+		val id = currentToken.kind match {
+			case OR =>
+				eat(OR)
+				new Identifier("||")
+			case AND =>
+				eat(AND)
+				new Identifier("&&")
+			case LESSTHAN =>
+				eat(LESSTHAN)
+				new Identifier("<")
+			case EQUALS =>
+				eat(EQUALS)
+				new Identifier("==")
+			case PLUS =>
+				eat(PLUS)
+				new Identifier("+")
+			case MINUS =>
+				eat(MINUS)
+				new Identifier("-")
+			case TIMES =>
+				eat(TIMES)
+				new Identifier("*")
+			case DIV =>
+				eat(DIV)
+				new Identifier("/")
+			case BANG =>
+				eat(BANG)
+				new Identifier("!")
+			case _ =>
+				parseIdentifier
+		}
         eat(LPAREN)
         var args: List[Formal] = Nil
         if (currentToken.kind == IDKIND) {
@@ -133,7 +165,9 @@ object Parser extends Pipeline[Iterator[Token], Program] {
         }
         eat(RETURN)
         val retExpr = parseExpression
-        eat(SEMICOLON)
+		if (currentToken.kind == SEMICOLON) {
+        	eat(SEMICOLON)
+		}
         eat(RBRACE)
         new MethodDecl(retType, id, args.reverse, vars.reverse, stats.reverse, retExpr)
     }
@@ -196,7 +230,9 @@ object Parser extends Pipeline[Iterator[Token], Program] {
                 eat(LPAREN)
                 val expr = parseExpression
                 eat(RPAREN)
-                eat(SEMICOLON)
+				if (currentToken.kind == SEMICOLON) {
+		        	eat(SEMICOLON)
+				}
                 new Println(expr)
             case _ =>
                 val id = parseIdentifier
@@ -204,7 +240,9 @@ object Parser extends Pipeline[Iterator[Token], Program] {
                     case EQSIGN =>
                         eat(EQSIGN)
                         val expr = parseExpression
-                        eat(SEMICOLON)
+						if (currentToken.kind == SEMICOLON) {
+				        	eat(SEMICOLON)
+						}
                         new Assign(id, expr)
                     case LBRACKET =>
                         eat(LBRACKET)
@@ -212,7 +250,9 @@ object Parser extends Pipeline[Iterator[Token], Program] {
                         eat(RBRACKET)
                         eat(EQSIGN)
                         val expr = parseExpression
-                        eat(SEMICOLON)
+						if (currentToken.kind == SEMICOLON) {
+				        	eat(SEMICOLON)
+						}
                         new ArrayAssign(id, index, expr)
                     case _ => expected(EQSIGN, LBRACKET)
                 }
@@ -225,7 +265,7 @@ object Parser extends Pipeline[Iterator[Token], Program] {
         currentToken.kind match {
             case OR =>
                 eat(OR)
-                parseOr(new Or(lhs, parseAndExpr))
+				parseOr(new Or(lhs, parseAndExpr))
             case _ => lhs
         }
     }
@@ -236,7 +276,7 @@ object Parser extends Pipeline[Iterator[Token], Program] {
         currentToken.kind match {
             case AND =>
                 eat(AND)
-                parseAnd(new And(lhs, parseLessThanEqualsExpr))
+				parseAnd(new And(lhs, parseLessThanEqualsExpr))
             case _ => lhs
         }
     }
@@ -247,10 +287,10 @@ object Parser extends Pipeline[Iterator[Token], Program] {
         currentToken.kind match {
             case LESSTHAN =>
                 eat(LESSTHAN)
-                parseLessThanEquals(new LessThan(lhs, parsePlusMinusExpr))
+				parseLessThanEquals(new LessThan(lhs, parsePlusMinusExpr))
             case EQUALS =>
                 eat(EQUALS)
-                parseLessThanEquals(new Equals(lhs, parsePlusMinusExpr))
+				parseLessThanEquals(new Equals(lhs, parsePlusMinusExpr))
             case _ => lhs
         }
     }
@@ -261,10 +301,10 @@ object Parser extends Pipeline[Iterator[Token], Program] {
         currentToken.kind match {
             case PLUS =>
                 eat(PLUS)
-                parsePlusMinus(new Plus(lhs, parseTimesDivExpr))
+				parsePlusMinus(new Plus(lhs, parseTimesDivExpr))
             case MINUS =>
                 eat(MINUS)
-                parsePlusMinus(new Minus(lhs, parseTimesDivExpr))
+				parsePlusMinus(new Minus(lhs, parseTimesDivExpr))
             case _ => lhs
         }
     }
@@ -275,10 +315,10 @@ object Parser extends Pipeline[Iterator[Token], Program] {
         currentToken.kind match {
             case TIMES =>
                 eat(TIMES)
-                parseTimesDiv(new Times(lhs, parseBangExpr))
+				parseTimesDiv(new Times(lhs, parseBangExpr))
             case DIV =>
                 eat(DIV)
-                parseTimesDiv(new Div(lhs, parseBangExpr))
+				parseTimesDiv(new Div(lhs, parseBangExpr))
             case _ => lhs
         }
     }
@@ -289,12 +329,24 @@ object Parser extends Pipeline[Iterator[Token], Program] {
         currentToken.kind match {
             case BANG =>
                 eat(BANG)
-                parseNext(new Not(parseNextExpr))
+				parseNext(new Not(parseNextExpr))
             case _ => parseBangExpr
         }
     }
 
     def parseBangExpr: ExprTree = parseNext(parseSimpleExpr)
+
+	def parseArgumentsMethod: List[ExprTree] = {
+		var args: List[ExprTree] = Nil
+		if (currentToken.kind != RPAREN) {
+			args = parseExpression :: args
+			while (currentToken.kind == COMMA) {
+				eat(COMMA)
+				args = parseExpression :: args
+			}
+		}
+		args
+	}
 
     def parseNext(lhs: ExprTree): ExprTree = {
         currentToken.kind match {
@@ -304,22 +356,70 @@ object Parser extends Pipeline[Iterator[Token], Program] {
                     case LENGTH =>
                         eat(LENGTH)
                         parseNext(new ArrayLength(lhs))
+					case OR =>
+						eat(OR)
+						eat(LPAREN)
+						val args = parseArgumentsMethod
+						eat(RPAREN)
+						parseNext(new MethodCall(lhs, new Identifier("||"), args))
+					case AND =>
+						eat(AND)
+						eat(LPAREN)
+						val args = parseArgumentsMethod
+						eat(RPAREN)
+						parseNext(new MethodCall(lhs, new Identifier("&&"), args))
+					case LESSTHAN =>
+						eat(LESSTHAN)
+						eat(LPAREN)
+						val args = parseArgumentsMethod
+						eat(RPAREN)
+						parseNext(new MethodCall(lhs, new Identifier("<"), args))
+					case EQUALS =>
+						eat(EQUALS)
+						eat(LPAREN)
+						val args = parseArgumentsMethod
+						eat(RPAREN)
+						parseNext(new MethodCall(lhs, new Identifier("=="), args))
+					case PLUS =>
+						eat(PLUS)
+						eat(LPAREN)
+						val args = parseArgumentsMethod
+						eat(RPAREN)
+						parseNext(new MethodCall(lhs, new Identifier("+"), args))
+					case MINUS =>
+						eat(MINUS)
+						eat(LPAREN)
+						val args = parseArgumentsMethod
+						eat(RPAREN)
+						parseNext(new MethodCall(lhs, new Identifier("-"), args))
+					case TIMES =>
+						eat(TIMES)
+						eat(LPAREN)
+						val args = parseArgumentsMethod
+						eat(RPAREN)
+						parseNext(new MethodCall(lhs, new Identifier("*"), args))
+					case DIV =>
+						eat(DIV)
+						eat(LPAREN)
+						val args = parseArgumentsMethod
+						eat(RPAREN)
+						parseNext(new MethodCall(lhs, new Identifier("/"), args))
+					case BANG =>
+						eat(BANG)
+						eat(LPAREN)
+						val args = parseArgumentsMethod
+						eat(RPAREN)
+						parseNext(new MethodCall(lhs, new Identifier("!"), args))
                     case _ =>
                         currentToken match {
                             case x: ID =>
                                 eat(IDKIND)
                                 eat(LPAREN)
-                                var args: List[ExprTree] = Nil
-                                if (currentToken.kind != RPAREN) {
-                                    args = parseExpression :: args
-                                    while (currentToken.kind == COMMA) {
-                                        eat(COMMA)
-                                        args = parseExpression :: args
-                                    }
-                                }
+                                val args = parseArgumentsMethod
                                 eat(RPAREN)
                                 parseNext(new MethodCall(lhs, new Identifier(x.value), args.reverse))
-                            case _ => expected(IDKIND)
+                            case _ =>
+								expected(IDKIND)
                         }
                 }
             case LBRACKET =>
