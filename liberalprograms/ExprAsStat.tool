@@ -25,7 +25,6 @@ class Run {
         5 + 5;
         "abc";
         e.setReal(5);
-        println("e = " + e.toString());
         return 0;
     }
 }
