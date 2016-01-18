@@ -12,4 +12,14 @@ This feature required modifying not only the \lstinline$Parser$, but the name an
 \subsection{Operators as methods}
 To implement this extension, we first modified the parsing of a method declaration. After the \lstinline$DEF$ token, we check if an operator was following. If it is the case, we eat it and add an \lstinline$Identifier$ corresponding to the operator. If it is not the case, we parse a simple \lstinline$Identifier$. Then, for the method calls, we added some cases when we found a \lstinline$DOT$ in the code. If an operator was following, we interpreted it as a method call with the corresponding \lstinline$Identifier$.
 
+\vspace{1cm}
 
+We have included several test programs to show some of the features we have added to the Tool langauge. They are in the folder liberalprograms/ and can be compiled from sbt.
+
+Programs:
+
+\begin{itemize}
+    \item NonLiberal.tool
+    \item InfixMethods.tool
+    \item ExprAsStat.tool
+\end{itemize}
