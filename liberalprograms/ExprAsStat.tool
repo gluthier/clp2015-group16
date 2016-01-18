@@ -22,6 +22,8 @@ class Run {
         println("c = " + c.toString());
         println("d = " + d.toString());
         println("e = " + e.toString());
+        5 + 5;
+        "abc";
         x = e.setReal(5);
         println("e = " + e.toString());
         return 0;
