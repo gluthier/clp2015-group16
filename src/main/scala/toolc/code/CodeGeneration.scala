@@ -208,6 +208,9 @@ object CodeGeneration extends Pipeline[Program, Unit] {
                 IASTORE
 
             }
+
+          case _ =>
+            ch
         }
       }
     }

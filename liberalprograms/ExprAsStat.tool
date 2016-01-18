@@ -1,4 +1,4 @@
-object NonLiberal {
+object ExprAsStat {
 	def main(): Unit = {
 	    println(new Run().start());
 	}
@@ -24,7 +24,7 @@ class Run {
         println("e = " + e.toString());
         5 + 5;
         "abc";
-        x = e.setReal(5);
+        e.setReal(5);
         println("e = " + e.toString());
         return 0;
     }
