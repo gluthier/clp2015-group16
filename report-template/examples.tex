@@ -1,6 +1,6 @@
 \subsection{Semicolon inference}
 
-This extension allow us to write code without any semicolon at the end of the lines. We can still specify it if wanted. It is compulsory if we want to write multiple statements in one line.
+This extension allows us to write code without semicolons at the end of the lines. The semicolon becomes an optional element in a statement. It is however still necessary to separate multiple statements on the same line of code.
 
 \begin{lstlisting}
 object SemiColonInference {
@@ -11,17 +11,17 @@ object SemiColonInference {
 
 class Tester {
     def test() : Int = {
-			var a : Int
-			var b : Int
+		var a : Int
+		var b : Int
 
-			a = 1; b = 2
+		a = 1; b = 2
 
-			a =
-				a
-				+ b
-				* 4
+		a =
+			a
+			+ b
+			* 4
 
-			return a
+		return a
     }
 }
 \end{lstlisting}

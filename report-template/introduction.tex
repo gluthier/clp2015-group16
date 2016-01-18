@@ -1,1 +1,12 @@
-We wrote a complete compiler. It starts by reading the code and decoding it as \lstinline$Tokens$. With the \lstinline$Tokens$, it parse them by following the grammar imposed by the \lstinline$Tool$ language. Then it analyze it and attribute each \lstinline$Identifier$ a symbol in order to know which variable it is using. At the end, it checks the types of all \lstinline$Identifier$ and generate the associated code.
+We wrote a complete compiler. It starts by reading the code using the \lstinline$Lexer$ and decoding it as \lstinline$Tokens$. These \lstinline$Tokens$ are parsed according to the grammar imposed by the \lstinline$Tool$ language. After this, the code is analysed and type checked. Finally, the compiler generates .class files so that the \lstinline$Tool$ program can run on the Java Virtual Machine (JVM).
+
+Our project goal was to allow a more liberal syntax for the \lstinline$Tool$ programming language. Four main features where to be implemented.
+
+\begin{enumerate}
+    \item \textbf{Semicolon inference}: optional semicolons to indicate the end of an instruction. To do this, our parser does the longest possible match on instructions. This means that it is possible to span an instruction over several lines and that it will be parsed correctly.
+    \item \textbf{Methods as infix operators}: ability to call methods in an infix way. This applies only to methods that have only one argument to keep the code readable. Methods with several arguments still have to be called using the standard \lstinline$Tool$ notation.
+    \item \textbf{Expressions as statements}: let expressions take the place of statements. Even though it is not very interesting to be able to have literals hanging around in the code, it allows the \lstinline$Tool$ programmer to call methods of an object without necessarily having to assign the return value to a variable. This can help to remove a lot of code clutter.
+    \item \textbf{Operators as methods}: override or define operators for custom classes. This feature makes it possible to have methods defined with operators (+, -, *...) for the user's classes. The aim of this extension is to allow the programmer to have clearer code by being able to define these methods for any class.
+\end{enumerate}
+
+The first thing we had to do was to correct the mistakes in \lstinline$CodeGeneration$ to be able to output correct Java .class files.
