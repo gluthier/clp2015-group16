@@ -1,12 +1,15 @@
-To implement all extensions, we modified the \lstinline$Parser$.
+To implement these extensions, we modified the \lstinline$Parser$ mainly.
 
 \subsection{Semicolon inference}
 Implementing this extension was quite straightforward. Every time the grammar stated that a semicolon was needed, we relaxed this rule. Now if a semicolon is found at the old place, we eat it and continue. But we do the same thing if no semicolon is found.
 
 \subsection{Methods as infix operators}
-To implement this extension, we added the grammar rule: \lstinline$expression identifier expression$.
+To implement this extension, we essentially added the grammar rule: \lstinline$expression identifier expression$. 
 
 \subsection{Expressions as statements}
+This feature required modifying not only the \lstinline$Parser$, but the name analysis and the type checker as well. This way expressions can be evaluated and be part of tool programs.
 
 \subsection{Operators as methods}
 To implement this extension, we first modified the parsing of a method declaration. After the \lstinline$DEF$ token, we check if an operator was following. If it is the case, we eat it and add an \lstinline$Identifier$ corresponding to the operator. If it is not the case, we parse a simple \lstinline$Identifier$. Then, for the method calls, we added some cases when we found a \lstinline$DOT$ in the code. If an operator was following, we interpreted it as a method call with the corresponding \lstinline$Identifier$.
+
+
